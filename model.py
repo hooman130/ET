@@ -69,6 +69,14 @@ STATION_FOLDERS = [
     "Anoano_Farms"                   # From Anoano Farms
 ]
 
+# Train models individually for each farm when True. When False, all data is
+# combined as before.
+TRAIN_PER_FARM = False
+
+# Directory to store trained models and scalers when TRAIN_PER_FARM is enabled
+MODELS_DIR = "models"
+os.makedirs(MODELS_DIR, exist_ok=True)
+
 # Base directory for station folders
 BASE_DIR = "farm_data"
 
@@ -280,11 +288,151 @@ def plot_training_history(history, save_path):
     plt.close()
 
 # -------------------------------
+# 4. Per-Farm Training Function
+# -------------------------------
+def train_for_station(station_folder):
+    """Train and evaluate a model for a single farm."""
+    df_station = load_station_data(station_folder)
+    if df_station.empty:
+        print(f"No data for station {station_folder}. Skipping.")
+        return
+
+    df_train, df_test = split_test_by_date(
+        df_station,
+        station_folder,
+        station_folder,
+        TEST_START,
+        TEST_END,
+    )
+
+    df_train = feature_engineering(df_train)
+    df_test = feature_engineering(df_test)
+
+    if df_train.empty:
+        print(f"No training data for station {station_folder}. Skipping.")
+        return
+
+    scaler = StandardScaler()
+    scaler.fit(df_train.values)
+
+    scaler_path = os.path.join(MODELS_DIR, f"{station_folder}_scaler_ET.pkl")
+    with open(scaler_path, "wb") as f:
+        pickle.dump(scaler, f)
+
+    df_train_scaled = pd.DataFrame(
+        scaler.transform(df_train.values), columns=df_train.columns
+    )
+
+    X_train_full, y_train_full = create_sequences(
+        df_train_scaled,
+        window_size=WINDOW_SIZE,
+        horizon=HORIZON,
+        target_col=TARGET_COL,
+    )
+
+    indices = np.arange(len(X_train_full))
+    np.random.shuffle(indices)
+    X_train_full = X_train_full[indices]
+    y_train_full = y_train_full[indices]
+
+    train_size = int(TRAIN_VAL_RATIO * len(X_train_full))
+    X_val = X_train_full[train_size:]
+    y_val = y_train_full[train_size:]
+    X_train = X_train_full[:train_size]
+    y_train = y_train_full[:train_size]
+
+    num_features = df_train.shape[1]
+    model = Sequential()
+    model.add(LSTM(64, activation="tanh", input_shape=(WINDOW_SIZE, num_features)))
+    model.add(Dense(HORIZON))
+    model.compile(
+        loss="mse",
+        optimizer=Adam(learning_rate=0.001),
+        metrics=["mae", r2_keras],
+    )
+
+    early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
+
+    history = model.fit(
+        X_train,
+        y_train,
+        validation_data=(X_val, y_val),
+        epochs=50,
+        batch_size=32,
+        callbacks=[early_stop],
+        verbose=1,
+    )
+
+    model_path = os.path.join(MODELS_DIR, f"{station_folder}_model_lstm.h5")
+    model.save(model_path)
+    print(f"Model saved to {model_path}")
+
+    station_plot_dir = os.path.join(PLOTS_DIR, station_folder)
+    os.makedirs(station_plot_dir, exist_ok=True)
+
+    history_csv_path = os.path.join(station_plot_dir, "training_history_values.csv")
+    pd.DataFrame(history.history).to_csv(history_csv_path, index=False)
+
+    plot_history_path = os.path.join(station_plot_dir, "training_history.png")
+    plot_training_history(history, plot_history_path)
+
+    if not df_test.empty:
+        df_test_scaled = pd.DataFrame(
+            scaler.transform(df_test.values), columns=df_test.columns
+        )
+        X_test, y_test = create_sequences(
+            df_test_scaled,
+            window_size=WINDOW_SIZE,
+            horizon=HORIZON,
+            target_col=TARGET_COL,
+        )
+        if len(X_test) > 0:
+            y_test_pred_scaled = model.predict(X_test)
+
+            df_cols = list(df_test.columns)
+            y_test_inv = inverse_transform_predictions(y_test, scaler, df_cols, TARGET_COL)
+            y_pred_inv = inverse_transform_predictions(
+                y_test_pred_scaled, scaler, df_cols, TARGET_COL
+            )
+
+            mse = mean_squared_error(
+                y_test_inv, y_pred_inv, multioutput="uniform_average"
+            )
+            mae = mean_absolute_error(
+                y_test_inv, y_pred_inv, multioutput="uniform_average"
+            )
+            rmse = math.sqrt(mse)
+            r2 = r2_score(y_test_inv, y_pred_inv, multioutput="uniform_average")
+
+            print(
+                f"\n--- Test Metrics for station: {station_folder} (range: {TEST_START} to {TEST_END}) ---"
+            )
+            print(f"MAE:  {mae:.4f}")
+            print(f"MSE:  {mse:.4f}")
+            print(f"RMSE: {rmse:.4f}")
+            print(f"R²:   {r2:.4f}")
+
+            plot_time_series_predictions(y_test_inv, y_pred_inv, HORIZON, station_folder)
+            for day_idx in range(HORIZON):
+                plot_scatter_day(y_test_inv, y_pred_inv, day_idx, station_folder)
+        else:
+            print(
+                f"Not enough test data to form sequences for station: {station_folder}. Skipping evaluation."
+            )
+
+
+# -------------------------------
 # 4. Main Script
 # -------------------------------
 def main():
     np.random.seed(RANDOM_SEED)
     tf.random.set_seed(RANDOM_SEED)
+
+    if TRAIN_PER_FARM:
+        for station in STATION_FOLDERS:
+            train_for_station(station)
+        print("\nAll done. End of script.")
+        return
 
     train_list = []
     test_data_by_station = {}
