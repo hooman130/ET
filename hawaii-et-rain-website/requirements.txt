@@ -1,0 +1,21 @@
+pandas
+folium
+joblib
+keras
+keras_nightly
+matplotlib
+numpy
+pydeck
+Requests
+SALib
+scikit_learn
+scipy
+seaborn
+streamlit
+streamlit_folium
+schedule
+tqdm
+streamlit_option_menu
+streamlit-extras
+tensorflow
+# time
