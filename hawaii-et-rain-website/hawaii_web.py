@@ -39,11 +39,13 @@ farms = [
 ]
 farm_coords = {farm["name"]: {"lat": farm["lat"], "lng": farm["lng"]} for farm in farms}
 
+# Directory containing per-farm models and scaler files
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-MODEL_ET_PATH = "./models/model_lstm.h5"
-MODEL_RAIN_PATH = "./models/model_rain_lstm.h5"
-SCALER_ET_PATH = "./models/scaler_model_ET.pkl"
-SCALER_RAIN_PATH = "./models/scaler_model_Rain.pkl" 
+# Caches for loaded models and scalers to avoid re-loading on each request
+models_cache = {}
+scalers_cache = {}
 
 
 WINDOW_SIZE = 24
@@ -68,28 +70,60 @@ def r2_keras(y_true, y_pred):
     return 1 - ss_res / (ss_tot + K.epsilon())
 
 dependencies = {'r2_keras': r2_keras}
-try:
-    model_et = load_model(MODEL_ET_PATH, custom_objects=dependencies, compile=False)
-    model_et.compile(optimizer='adam', loss='mse') 
-except Exception as e:
-    print(f"Error loading ET model: {e}")
-    model_et = None
-try:
-    model_rain = load_model(MODEL_RAIN_PATH, custom_objects=dependencies, compile=False)
-    model_rain.compile(optimizer='adam', loss='mse') 
-except Exception as e:
-    print(f"Error loading Rainfall model: {e}")
-    model_rain = None
-try:
-    scaler_et = joblib.load(SCALER_ET_PATH)
-except Exception as e:
-    print(f"Error loading ET scaler from {SCALER_ET_PATH}: {e}")
-    scaler_et = None
-try:
-    scaler_rain = joblib.load(SCALER_RAIN_PATH)
-except Exception as e:
-    print(f"Error loading Rain scaler from {SCALER_RAIN_PATH}: {e}")
-    scaler_rain = None
+
+def sanitize_farm_name(farm_name: str) -> str:
+    """Convert farm name to a filesystem friendly format used for models."""
+    return (farm_name.replace(" ", "_")
+                     .replace("'", "")
+                     .replace(",", "")
+                     .replace("(", "")
+                     .replace(")", ""))
+
+
+def load_models_for_farm(farm_name):
+    """Load ET/Rain models and scalers for a specific farm, using caches when available."""
+    if farm_name in models_cache and farm_name in scalers_cache:
+        return (models_cache[farm_name].get('et'),
+                models_cache[farm_name].get('rain'),
+                scalers_cache[farm_name].get('et'),
+                scalers_cache[farm_name].get('rain'))
+
+    base = sanitize_farm_name(farm_name)
+    model_et_path = os.path.join(MODELS_DIR, f"{base}_model_lstm.h5")
+    model_rain_path = os.path.join(MODELS_DIR, f"{base}_model_rain_lstm.h5")
+    scaler_et_path = os.path.join(MODELS_DIR, f"{base}_scaler_ET.pkl")
+    scaler_rain_path = os.path.join(MODELS_DIR, f"{base}_scaler_Rain.pkl")
+
+    try:
+        model_et = load_model(model_et_path, custom_objects=dependencies, compile=False)
+        model_et.compile(optimizer='adam', loss='mse')
+    except Exception as e:
+        print(f"Error loading ET model for {farm_name}: {e}")
+        model_et = None
+
+    try:
+        model_rain = load_model(model_rain_path, custom_objects=dependencies, compile=False)
+        model_rain.compile(optimizer='adam', loss='mse')
+    except Exception as e:
+        print(f"Error loading Rainfall model for {farm_name}: {e}")
+        model_rain = None
+
+    try:
+        scaler_et = joblib.load(scaler_et_path)
+    except Exception as e:
+        print(f"Error loading ET scaler for {farm_name}: {e}")
+        scaler_et = None
+
+    try:
+        scaler_rain = joblib.load(scaler_rain_path)
+    except Exception as e:
+        print(f"Error loading Rain scaler for {farm_name}: {e}")
+        scaler_rain = None
+
+    models_cache[farm_name] = {'et': model_et, 'rain': model_rain}
+    scalers_cache[farm_name] = {'et': scaler_et, 'rain': scaler_rain}
+
+    return model_et, model_rain, scaler_et, scaler_rain
 
 
 
@@ -229,10 +263,11 @@ def inverse_transform_predictions(y_scaled, target_scaler, feature_column_order,
 
 
 def fetch_and_predict_hawaii(farm_name):
-    
-    if not all([model_et, model_rain, scaler_et, scaler_rain]): 
-        print("Error: One or more models/scalers are not loaded. Cannot predict.")
-        
+
+    model_et, model_rain, scaler_et, scaler_rain = load_models_for_farm(farm_name)
+
+    if not all([model_et, model_rain, scaler_et, scaler_rain]):
+        print(f"Error: One or more models/scalers could not be loaded for {farm_name}.")
         return None
 
     if farm_name not in farm_coords:
@@ -358,45 +393,37 @@ def fetch_and_predict_hawaii(farm_name):
 
 
 if __name__ == "__main__":
-    
-    
-
-    
-    
 
     print("--- Running hawaii_web.py directly for testing ---")
-    if not all([model_et, model_rain, scaler_et, scaler_rain]):
-        print("One or more models/scalers failed to load. Please check paths and files in the 'models' directory.")
-        print(f"  model_et loaded: {'Yes' if model_et else 'No'}")
-        print(f"  model_rain loaded: {'Yes' if model_rain else 'No'}")
-        print(f"  scaler_et loaded: {'Yes' if scaler_et else 'No'}")
-        print(f"  scaler_rain loaded: {'Yes' if scaler_rain else 'No'}")
-    else:
-        print("All models and scalers appear to be loaded.")
 
-    
-    
-    test_farm = "Kahuku Farm" 
-    
+    test_farm = "Kahuku Farm"
+
     if test_farm not in farm_coords:
         print(f"Test farm '{test_farm}' not in farm_coords list. Available: {list(farm_coords.keys())}")
     else:
-        print(f"\nAttempting prediction for test farm: {test_farm}...")
-        prediction_results = fetch_and_predict_hawaii(test_farm)
-
-        if prediction_results:
-            print("\n--- Prediction Results ---")
-            print(f"Farm: {prediction_results['farm']}")
-            print(f"Latitude: {prediction_results['latitude']:.4f}, Longitude: {prediction_results['longitude']:.4f}")
-            print(f"Last Input Data Date Used: {prediction_results['last_data_date']}")
-            print("Forecast:")
-            for i in range(HORIZON):
-                pred_date = prediction_results['prediction_dates'][i]
-                et_val = prediction_results['et_mm_day'][i]
-                rain_val = prediction_results['rain_mm'][i]
-
-                et_str = f"{et_val:.2f}" if pd.notna(et_val) else "N/A"
-                rain_str = f"{rain_val:.2f}" if pd.notna(rain_val) else "N/A"
-                print(f"  - {pred_date}: ET₀ = {et_str} mm/day, Rainfall = {rain_str} mm")
+        model_et, model_rain, scaler_et, scaler_rain = load_models_for_farm(test_farm)
+        if not all([model_et, model_rain, scaler_et, scaler_rain]):
+            print("Failed to load required models or scalers for testing.")
         else:
-            print(f"\n❌ Prediction failed for {test_farm}. Check console for detailed error messages.")
+            print(f"\nAttempting prediction for test farm: {test_farm}...")
+            prediction_results = fetch_and_predict_hawaii(test_farm)
+
+            if prediction_results:
+                print("\n--- Prediction Results ---")
+                print(f"Farm: {prediction_results['farm']}")
+                print(f"Latitude: {prediction_results['latitude']:.4f}, Longitude: {prediction_results['longitude']:.4f}")
+                print(f"Last Input Data Date Used: {prediction_results['last_data_date']}")
+                print("Forecast:")
+                for i in range(HORIZON):
+                    pred_date = prediction_results['prediction_dates'][i]
+                    et_val = prediction_results['et_mm_day'][i]
+                    rain_val = prediction_results['rain_mm'][i]
+
+                    et_str = f"{et_val:.2f}" if pd.notna(et_val) else "N/A"
+                    rain_str = f"{rain_val:.2f}" if pd.notna(rain_val) else "N/A"
+                    print(f"  - {pred_date}: ET₀ = {et_str} mm/day, Rainfall = {rain_str} mm")
+            else:
+                print(f"\n❌ Prediction failed for {test_farm}. Check console for detailed error messages.")
+
+    
+    
