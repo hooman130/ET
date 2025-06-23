@@ -94,7 +94,7 @@ RANDOM_SEED = 42
 MODEL_PATH = "model_rain_lstm.h5"
 
 # Where to save plots and results
-PLOTS_DIR = "plots_test_2years"
+PLOTS_DIR = "plots_test_2years_rainfall"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 # -------------------------------
