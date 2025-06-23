@@ -581,7 +581,7 @@ def main():
         df_cols = list(df_test_stn.columns)  # same order
         y_test_inv  = inverse_transform_predictions(y_test, scaler, df_cols, TARGET_COL)
         y_pred_inv = inverse_transform_predictions(y_test_pred_scaled, scaler, df_cols, TARGET_COL)
-
+        
         # Compute metrics (averaged across the forecast horizon)
         mse = mean_squared_error(y_test_inv, y_pred_inv, multioutput='uniform_average')
         mae = mean_absolute_error(y_test_inv, y_pred_inv, multioutput='uniform_average')
