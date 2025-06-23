@@ -61,7 +61,7 @@ STATION_FOLDERS = [
 
 # Train models individually for each farm when True. When False, all data is
 # combined as before.
-TRAIN_PER_FARM = False
+TRAIN_PER_FARM = True
 
 # Directory to store trained models and scalers when TRAIN_PER_FARM is enabled
 MODELS_DIR = "models"
