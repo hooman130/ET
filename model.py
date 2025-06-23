@@ -1,17 +1,9 @@
 """
-Multi-Station, Multi-Step LSTM Forecast for ET (mm/day)
-Test Data = 2 Specific Years for One Station
+Multi-Station, Multi-Step LSTM Forecast for ET (mm/day).
 
-In this example:
-- We pick one station (TEST_STATION) and a date range (TEST_START, TEST_END)
-  as the test set.
-- All data from other stations and all other dates of the test station go to training.
-- We scale the training data, create sequences (24-day input -> next 3 days).
-- We train LSTM (80%/20% train/val) and compute a custom R² metric (r2_keras).
-- We evaluate on the 2-year test range of the chosen station, 
-  plotting actual vs. predicted time-series and scatter plots.
-
-Adjust station name, date range, or scaling method as needed.
+Each farm's data is split chronologically: the first 70% is used for
+training, the next 15% for validation and the final 15% for testing.
+Models can be trained individually per farm or on the combined data set.
 """
 import pickle
 import os
@@ -80,10 +72,10 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 # Base directory for station folders
 BASE_DIR = "farm_data"
 
-# We designate one station + date range as test data
-TEST_STATION = "Kupaa_Farms"
-TEST_START   = "2021-01-01"
-TEST_END     = "2022-12-31"
+# Ratios for chronological split of each farm's data
+TRAIN_RATIO = 0.70
+VAL_RATIO = 0.15
+TEST_RATIO = 0.15
 
 # Input sequence length (days to look back)
 WINDOW_SIZE = 24
@@ -94,8 +86,6 @@ HORIZON = 3
 # Target column name
 TARGET_COL = "ET (mm/day)"
 
-# Train/Validation ratio for the training set
-TRAIN_VAL_RATIO = 0.8  # 80% train, 20% validation
 
 # Random seed for reproducibility
 RANDOM_SEED = 42
@@ -143,26 +133,21 @@ def load_station_data(station_folder):
         df.reset_index(drop=True, inplace=True)
     return df
 
-def split_test_by_date(df, station_name, test_station, start_date, end_date):
-    """
-    If station_name != test_station:
-      -> All data is training.
-    Else (station_name == test_station):
-      -> Rows in [start_date, end_date] = test data, rest = train data.
-    Returns (df_train, df_test).
-    """
+def split_by_percentages(df, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=TEST_RATIO):
+    """Split a DataFrame chronologically into train/val/test portions."""
     if df.empty or "Date" not in df.columns:
-        return df, pd.DataFrame()
+        return df, pd.DataFrame(), pd.DataFrame()
 
-    if station_name != test_station:
-        # Entire DataFrame is training data
-        return df, pd.DataFrame()
-    else:
-        # For the test station, split by date range
-        mask_test = (df["Date"] >= start_date) & (df["Date"] <= end_date)
-        df_test = df[mask_test].copy()
-        df_train = df[~mask_test].copy()
-        return df_train, df_test
+    df_sorted = df.sort_values("Date").reset_index(drop=True)
+    n = len(df_sorted)
+    train_end = int(n * train_ratio)
+    val_end = train_end + int(n * val_ratio)
+
+    df_train = df_sorted.iloc[:train_end].copy()
+    df_val = df_sorted.iloc[train_end:val_end].copy()
+    df_test = df_sorted.iloc[val_end:].copy()
+
+    return df_train, df_val, df_test
 
 def feature_engineering(df):
     """
@@ -301,15 +286,10 @@ def train_for_station(station_folder):
         print(f"No data for station {station_folder}. Skipping.")
         return None
 
-    df_train, df_test = split_test_by_date(
-        df_station,
-        station_folder,
-        station_folder,
-        TEST_START,
-        TEST_END,
-    )
+    df_train, df_val, df_test = split_by_percentages(df_station)
 
     df_train = feature_engineering(df_train)
+    df_val = feature_engineering(df_val)
     df_test = feature_engineering(df_test)
 
     if df_train.empty:
@@ -326,24 +306,27 @@ def train_for_station(station_folder):
     df_train_scaled = pd.DataFrame(
         scaler.transform(df_train.values), columns=df_train.columns
     )
+    df_val_scaled = pd.DataFrame(
+        scaler.transform(df_val.values), columns=df_val.columns
+    )
 
-    X_train_full, y_train_full = create_sequences(
+    X_train, y_train = create_sequences(
         df_train_scaled,
         window_size=WINDOW_SIZE,
         horizon=HORIZON,
         target_col=TARGET_COL,
     )
-
-    indices = np.arange(len(X_train_full))
+    indices = np.arange(len(X_train))
     np.random.shuffle(indices)
-    X_train_full = X_train_full[indices]
-    y_train_full = y_train_full[indices]
+    X_train = X_train[indices]
+    y_train = y_train[indices]
 
-    train_size = int(TRAIN_VAL_RATIO * len(X_train_full))
-    X_val = X_train_full[train_size:]
-    y_val = y_train_full[train_size:]
-    X_train = X_train_full[:train_size]
-    y_train = y_train_full[:train_size]
+    X_val, y_val = create_sequences(
+        df_val_scaled,
+        window_size=WINDOW_SIZE,
+        horizon=HORIZON,
+        target_col=TARGET_COL,
+    )
 
     num_features = df_train.shape[1]
     model = Sequential()
@@ -418,9 +401,7 @@ def train_for_station(station_folder):
             rmse = math.sqrt(mse)
             r2 = r2_score(y_test_inv, y_pred_inv, multioutput="uniform_average")
 
-            print(
-                f"\n--- Test Metrics for station: {station_folder} (range: {TEST_START} to {TEST_END}) ---"
-            )
+            print(f"\n--- Test Metrics for station: {station_folder} ---")
             print(f"MAE:  {mae:.4f}")
             print(f"MSE:  {mse:.4f}")
             print(f"RMSE: {rmse:.4f}")
@@ -460,6 +441,7 @@ def main():
         return
 
     train_list = []
+    val_list = []
     test_data_by_station = {}
 
     # A) For each station, load data and split into train/test by date range
@@ -468,22 +450,16 @@ def main():
         if df_station.empty:
             continue
         
-        # If station != TEST_STATION, all data goes to training
-        # If station == TEST_STATION, rows in [TEST_START, TEST_END] => test
-        df_train_stn, df_test_stn = split_test_by_date(
-            df_station, 
-            station, 
-            TEST_STATION, 
-            TEST_START, 
-            TEST_END
-        )
+        df_train_stn, df_val_stn, df_test_stn = split_by_percentages(df_station)
 
-        # Feature engineering
         df_train_stn = feature_engineering(df_train_stn)
+        df_val_stn  = feature_engineering(df_val_stn)
         df_test_stn  = feature_engineering(df_test_stn)
 
         if not df_train_stn.empty:
             train_list.append(df_train_stn)
+        if not df_val_stn.empty:
+            val_list.append(df_val_stn)
         test_data_by_station[station] = df_test_stn
 
     # B) Combine all training data
@@ -502,28 +478,35 @@ def main():
     with open('scaler_model_ET.pkl', 'wb') as f:
         pickle.dump(scaler, f)    
         # return
-    df_train_scaled = pd.DataFrame(scaler.transform(df_train_all.values), columns=df_train_all.columns)
+    df_train_scaled = pd.DataFrame(
+        scaler.transform(df_train_all.values), columns=df_train_all.columns
+    )
+    df_val_all = pd.concat(val_list, ignore_index=True) if val_list else pd.DataFrame()
+    if not df_val_all.empty:
+        df_val_scaled = pd.DataFrame(
+            scaler.transform(df_val_all.values), columns=df_val_all.columns
+        )
+    else:
+        df_val_scaled = pd.DataFrame(columns=df_train_all.columns)
 
-    # D) Create sequences for training
-    X_train_full, y_train_full = create_sequences(
+    # D) Create sequences for training and validation
+    X_train, y_train = create_sequences(
         df_train_scaled,
         window_size=WINDOW_SIZE,
         horizon=HORIZON,
         target_col=TARGET_COL
     )
-    print("Full training sequences:", len(X_train_full))
-
-    # E) Shuffle & split into train/validation
-    indices = np.arange(len(X_train_full))
+    indices = np.arange(len(X_train))
     np.random.shuffle(indices)
-    X_train_full = X_train_full[indices]
-    y_train_full = y_train_full[indices]
+    X_train = X_train[indices]
+    y_train = y_train[indices]
 
-    train_size = int(TRAIN_VAL_RATIO * len(X_train_full))
-    X_val = X_train_full[train_size:]
-    y_val = y_train_full[train_size:]
-    X_train = X_train_full[:train_size]
-    y_train = y_train_full[:train_size]
+    X_val, y_val = create_sequences(
+        df_val_scaled,
+        window_size=WINDOW_SIZE,
+        horizon=HORIZON,
+        target_col=TARGET_COL
+    )
 
     print("Training sequences:", len(X_train))
     print("Validation sequences:", len(X_val))
@@ -603,7 +586,7 @@ def main():
         rmse = math.sqrt(mse)
         r2 = r2_score(y_test_inv, y_pred_inv, multioutput='uniform_average')
 
-        print(f"\n--- Test Metrics for station: {station} (range: {TEST_START} to {TEST_END}) ---")
+        print(f"\n--- Test Metrics for station: {station} ---")
         print(f"MAE:  {mae:.4f}")
         print(f"MSE:  {mse:.4f}")
         print(f"RMSE: {rmse:.4f}")
