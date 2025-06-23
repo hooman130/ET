@@ -5,6 +5,7 @@ For each farm the records are split chronologically: 70% for training,
 15% for validation and the remaining 15% for testing.  Models may be
 trained individually per farm or using the combined data.
 """
+
 import pickle
 import os
 import math
@@ -20,7 +21,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 # TensorFlow / Keras
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Input
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 import tensorflow.keras.backend as K
@@ -36,19 +37,19 @@ STATION_FOLDERS = [
     "Kahuku_Farm",
     "Nozawa_Farms",
     "Kuilima_Farms",
-    "Cabaero_Farms",                 # Corresponds to Cabaero Farms (lat: 20.8425, lng: -156.3471)
-    "Kupaa_Farms",                   # Corresponds to Kupa'a Farms (lat: 20.7658, lng: -156.3513)
-    "MAO_Organic_Farms_Original",    # From MA'O Organic Farms (original site)
-    "MAO_Organic_Farms_New",         # From MA'O Organic Farms (new site)
-    "2K_Farm_LLC",                   # From 2K Farm LLC
-    "Wong_Hon_Hin_Inc",              # From Wong Hon Hin Inc
-    "Hawaii_Taro_Farm_LLC",          # From Hawaii Taro Farm, LLC
-    "Hawaii_Seed_Pro_LLC_Farm",      # From Hawaii Seed Pro LLC Farm
-    "Cabaero_Farm",                  # Corresponds to Cabaero Farm (lat: 20.791703, lng: -156.358194)
-    "Kupaa_Farms2",                  # Second instance of Kupaa Farms (lat: 20.765515, lng: -156.35185)
-    "Hirako_Farm",                   # First instance of Hirako Farm
-    "Hirako_Farm1",                  # Second instance of Hirako Farm
-    "Anoano_Farms"                   # From Anoano Farms
+    "Cabaero_Farms",  # Corresponds to Cabaero Farms (lat: 20.8425, lng: -156.3471)
+    "Kupaa_Farms",  # Corresponds to Kupa'a Farms (lat: 20.7658, lng: -156.3513)
+    "MAO_Organic_Farms_Original",  # From MA'O Organic Farms (original site)
+    "MAO_Organic_Farms_New",  # From MA'O Organic Farms (new site)
+    "2K_Farm_LLC",  # From 2K Farm LLC
+    "Wong_Hon_Hin_Inc",  # From Wong Hon Hin Inc
+    "Hawaii_Taro_Farm_LLC",  # From Hawaii Taro Farm, LLC
+    "Hawaii_Seed_Pro_LLC_Farm",  # From Hawaii Seed Pro LLC Farm
+    "Cabaero_Farm",  # Corresponds to Cabaero Farm (lat: 20.791703, lng: -156.358194)
+    "Kupaa_Farms2",  # Second instance of Kupaa Farms (lat: 20.765515, lng: -156.35185)
+    "Hirako_Farm",  # First instance of Hirako Farm
+    "Hirako_Farm1",  # Second instance of Hirako Farm
+    "Anoano_Farms",  # From Anoano Farms
 ]
 
 # Train models individually for each farm when True. When False, all data is
@@ -87,13 +88,14 @@ MODEL_PATH = "model_rain_lstm.h5"
 PLOTS_DIR = "plots_test_2years_rainfall"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
+
 # -------------------------------
 # 2. Custom R² Metric
 # -------------------------------
 def r2_keras(y_true, y_pred):
     """
     Custom R² metric for Keras.
-    For multi-output (shape=[batch, horizon]), we flatten both 
+    For multi-output (shape=[batch, horizon]), we flatten both
     y_true and y_pred to compute an overall R².
     """
     y_true_f = K.flatten(y_true)
@@ -101,6 +103,7 @@ def r2_keras(y_true, y_pred):
     ss_res = K.sum(K.square(y_true_f - y_pred_f))
     ss_tot = K.sum(K.square(y_true_f - K.mean(y_true_f)))
     return 1 - ss_res / (ss_tot + K.epsilon())
+
 
 # -------------------------------
 # 3. Helper Functions
@@ -122,7 +125,10 @@ def load_station_data(station_folder):
         df.reset_index(drop=True, inplace=True)
     return df
 
-def split_by_percentages(df, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=TEST_RATIO):
+
+def split_by_percentages(
+    df, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=TEST_RATIO
+):
     """Split a DataFrame chronologically into train/val/test portions."""
     if df.empty or "Date" not in df.columns:
         return df, pd.DataFrame(), pd.DataFrame()
@@ -138,9 +144,10 @@ def split_by_percentages(df, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_
 
     return df_train, df_val, df_test
 
+
 def feature_engineering(df):
     """
-    Adds 'day', 'month' features, drops columns not needed (Date, etc.), 
+    Adds 'day', 'month' features, drops columns not needed (Date, etc.),
     and removes NaNs.
     """
     if df.empty:
@@ -161,6 +168,7 @@ def feature_engineering(df):
     df.reset_index(drop=True, inplace=True)
     return df
 
+
 def create_sequences(df, window_size, horizon, target_col):
     """
     Create time-series sequences from a DataFrame:
@@ -171,15 +179,18 @@ def create_sequences(df, window_size, horizon, target_col):
     X, y = [], []
     for i in range(len(df) - window_size - horizon + 1):
         X_i = data[i : i + window_size, :]
-        y_i = data[i + window_size : i + window_size + horizon, df.columns.get_loc(target_col)]
+        y_i = data[
+            i + window_size : i + window_size + horizon, df.columns.get_loc(target_col)
+        ]
         X.append(X_i)
         y.append(y_i)
     return np.array(X), np.array(y)
 
+
 def inverse_transform_predictions(y_scaled, scaler, df_columns, target_col):
     """
     Given scaled predictions (y_scaled) of shape (num_samples, horizon),
-    create a dummy array so we can apply inverse_transform, 
+    create a dummy array so we can apply inverse_transform,
     then return just the target column portion in the original scale.
     """
     n_samples, horizon = y_scaled.shape
@@ -189,13 +200,14 @@ def inverse_transform_predictions(y_scaled, scaler, df_columns, target_col):
     dummy = np.zeros((n_samples * horizon, n_features))
     # Place the scaled predictions in the target column
     for i in range(horizon):
-        dummy[i*n_samples:(i+1)*n_samples, target_idx] = y_scaled[:, i]
+        dummy[i * n_samples : (i + 1) * n_samples, target_idx] = y_scaled[:, i]
 
     dummy_inv = scaler.inverse_transform(dummy)
     target_inv = dummy_inv[:, target_idx]
     # Reshape to (n_samples, horizon)
     target_inv = target_inv.reshape(horizon, n_samples).T
     return target_inv
+
 
 def plot_time_series_predictions(y_true, y_pred, horizon, station_folder):
     """
@@ -208,14 +220,15 @@ def plot_time_series_predictions(y_true, y_pred, horizon, station_folder):
 
     plt.figure(figsize=(10, 8))
     for day_idx in range(horizon):
-        ax = plt.subplot(horizon, 1, day_idx+1)
-        ax.plot(y_true[:, day_idx], label="Actual", color='blue')
-        ax.plot(y_pred[:, day_idx], label="Predicted", color='red')
+        ax = plt.subplot(horizon, 1, day_idx + 1)
+        ax.plot(y_true[:, day_idx], label="Actual", color="blue")
+        ax.plot(y_pred[:, day_idx], label="Predicted", color="red")
         ax.set_title(f"Day +{day_idx+1} Rainfall Forecast")
         ax.legend()
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
+
 
 def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
     """
@@ -227,7 +240,7 @@ def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
     save_path = os.path.join(station_plot_dir, f"scatter_day{day_idx+1}.png")
 
     plt.figure(figsize=(6, 6))
-    plt.scatter(y_true[:, day_idx], y_pred[:, day_idx], alpha=0.5, color='green')
+    plt.scatter(y_true[:, day_idx], y_pred[:, day_idx], alpha=0.5, color="green")
     plt.title(f"Scatter Plot: Day +{day_idx+1} Rainfall")
     plt.xlabel("Actual Rainfall")
     plt.ylabel("Predicted Rainfall")
@@ -235,18 +248,19 @@ def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
     # Optionally, add a y=x line for reference
     min_val = min(y_true[:, day_idx].min(), y_pred[:, day_idx].min())
     max_val = max(y_true[:, day_idx].max(), y_pred[:, day_idx].max())
-    plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--')
+    plt.plot([min_val, max_val], [min_val, max_val], color="red", linestyle="--")
 
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
+
 
 def plot_training_history(history, save_path):
     """
     Plots training & validation loss over epochs, saving the plot to save_path.
     If R² is in the history, that is plotted as well.
     """
-    plt.figure(figsize=(8,5))
+    plt.figure(figsize=(8, 5))
     plt.plot(history.history["loss"], label="Train Loss")
     plt.plot(history.history["val_loss"], label="Val Loss")
     if "r2_keras" in history.history:
@@ -261,13 +275,14 @@ def plot_training_history(history, save_path):
     plt.savefig(save_path)
     plt.close()
 
+
 # -------------------------------
 # 4. Per-Farm Training Function
 # -------------------------------
 def train_for_station(station_folder):
     """Train and evaluate a rainfall model for a single farm.
 
-    Returns a dictionary with the final training and validation metrics
+    Returns a dictionary with the final training, validation, and test metrics
     for that farm.
     """
     df_station = load_station_data(station_folder)
@@ -320,7 +335,8 @@ def train_for_station(station_folder):
 
     num_features = df_train.shape[1]
     model = Sequential()
-    model.add(LSTM(64, activation="tanh", input_shape=(WINDOW_SIZE, num_features)))
+    model.add(Input(shape=(WINDOW_SIZE, num_features)))
+    model.add(LSTM(64, activation="tanh"))
     model.add(Dense(HORIZON))
     model.compile(
         loss="mse",
@@ -328,7 +344,9 @@ def train_for_station(station_folder):
         metrics=["mae", r2_keras],
     )
 
-    early_stop = EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)
+    early_stop = EarlyStopping(
+        monitor="val_loss", patience=5, restore_best_weights=True
+    )
 
     history = model.fit(
         X_train,
@@ -353,14 +371,37 @@ def train_for_station(station_folder):
     plot_history_path = os.path.join(station_plot_dir, "training_history.png")
     plot_training_history(history, plot_history_path)
 
+    # --------- Calculate validation metrics over whole val set ----------
+    y_val_pred_scaled = model.predict(X_val)
+    df_cols = list(df_val.columns)
+    y_val_inv = inverse_transform_predictions(y_val, scaler, df_cols, TARGET_COL)
+    y_val_pred_inv = inverse_transform_predictions(
+        y_val_pred_scaled, scaler, df_cols, TARGET_COL
+    )
+    val_mse = mean_squared_error(
+        y_val_inv, y_val_pred_inv, multioutput="uniform_average"
+    )
+    val_mae = mean_absolute_error(
+        y_val_inv, y_val_pred_inv, multioutput="uniform_average"
+    )
+    val_rmse = math.sqrt(val_mse)
+    val_r2 = r2_score(y_val_inv, y_val_pred_inv, multioutput="uniform_average")
+
     metrics_summary = {
         "farm": station_folder,
         "train_loss": history.history.get("loss", [None])[-1],
         "train_mae": history.history.get("mae", [None])[-1],
         "train_r2": history.history.get("r2_keras", [None])[-1],
-        "val_loss": history.history.get("val_loss", [None])[-1],
-        "val_mae": history.history.get("val_mae", [None])[-1],
-        "val_r2": history.history.get("val_r2_keras", [None])[-1],
+        # Validation metrics: computed on the full val set
+        "val_loss": val_mse,
+        "val_mae": val_mae,
+        "val_rmse": val_rmse,
+        "val_r2": val_r2,
+        # Placeholders for test metrics (filled below if available)
+        "test_mae": None,
+        "test_mse": None,
+        "test_rmse": None,
+        "test_r2": None,
     }
 
     if not df_test.empty:
@@ -377,7 +418,9 @@ def train_for_station(station_folder):
             y_test_pred_scaled = model.predict(X_test)
 
             df_cols = list(df_test.columns)
-            y_test_inv = inverse_transform_predictions(y_test, scaler, df_cols, TARGET_COL)
+            y_test_inv = inverse_transform_predictions(
+                y_test, scaler, df_cols, TARGET_COL
+            )
             y_pred_inv = inverse_transform_predictions(
                 y_test_pred_scaled, scaler, df_cols, TARGET_COL
             )
@@ -397,15 +440,25 @@ def train_for_station(station_folder):
             print(f"RMSE: {rmse:.4f}")
             print(f"R²:   {r2:.4f}")
 
-            plot_time_series_predictions(y_test_inv, y_pred_inv, HORIZON, station_folder)
+            plot_time_series_predictions(
+                y_test_inv, y_pred_inv, HORIZON, station_folder
+            )
             for day_idx in range(HORIZON):
                 plot_scatter_day(y_test_inv, y_pred_inv, day_idx, station_folder)
+
+            metrics_summary["test_mae"] = mae
+            metrics_summary["test_mse"] = mse
+            metrics_summary["test_rmse"] = rmse
+            metrics_summary["test_r2"] = r2
+
         else:
             print(
                 f"Not enough test data to form sequences for station: {station_folder}. Skipping evaluation."
             )
 
     return metrics_summary
+
+
 # -------------------------------
 # 4. Main Script
 # -------------------------------
@@ -437,12 +490,12 @@ def main():
         df_station = load_station_data(station)
         if df_station.empty:
             continue
-        
+
         df_train_stn, df_val_stn, df_test_stn = split_by_percentages(df_station)
 
         df_train_stn = feature_engineering(df_train_stn)
-        df_val_stn  = feature_engineering(df_val_stn)
-        df_test_stn  = feature_engineering(df_test_stn)
+        df_val_stn = feature_engineering(df_val_stn)
+        df_test_stn = feature_engineering(df_test_stn)
 
         if not df_train_stn.empty:
             train_list.append(df_train_stn)
@@ -461,9 +514,9 @@ def main():
     scaler = StandardScaler()
     scaler.fit(df_train_all.values)
 
-    with open('scaler_model_Rain.pkl', 'wb') as f:
-        pickle.dump(scaler, f)    
-        # return    
+    with open("scaler_model_Rain.pkl", "wb") as f:
+        pickle.dump(scaler, f)
+        # return
     df_train_scaled = pd.DataFrame(
         scaler.transform(df_train_all.values), columns=df_train_all.columns
     )
@@ -477,10 +530,7 @@ def main():
 
     # D) Create sequences for training and validation sets
     X_train, y_train = create_sequences(
-        df_train_scaled,
-        window_size=WINDOW_SIZE,
-        horizon=HORIZON,
-        target_col=TARGET_COL
+        df_train_scaled, window_size=WINDOW_SIZE, horizon=HORIZON, target_col=TARGET_COL
     )
     indices = np.arange(len(X_train))
     np.random.shuffle(indices)
@@ -488,10 +538,7 @@ def main():
     y_train = y_train[indices]
 
     X_val, y_val = create_sequences(
-        df_val_scaled,
-        window_size=WINDOW_SIZE,
-        horizon=HORIZON,
-        target_col=TARGET_COL
+        df_val_scaled, window_size=WINDOW_SIZE, horizon=HORIZON, target_col=TARGET_COL
     )
 
     print("Training sequences:", len(X_train))
@@ -500,23 +547,26 @@ def main():
     # F) Build & train LSTM model with custom R² metric
     num_features = df_train_all.shape[1]
     model = Sequential()
-    model.add(LSTM(64, activation='tanh', input_shape=(WINDOW_SIZE, num_features)))
+    model.add(LSTM(64, activation="tanh", input_shape=(WINDOW_SIZE, num_features)))
     model.add(Dense(HORIZON))
     model.compile(
-        loss='mse',
+        loss="mse",
         optimizer=Adam(learning_rate=0.001),
-        metrics=['mae', r2_keras]  # add custom R² metric
+        metrics=["mae", r2_keras],  # add custom R² metric
     )
 
-    early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+    early_stop = EarlyStopping(
+        monitor="val_loss", patience=5, restore_best_weights=True
+    )
 
     history = model.fit(
-        X_train, y_train,
+        X_train,
+        y_train,
         validation_data=(X_val, y_val),
         epochs=50,
         batch_size=32,
         callbacks=[early_stop],
-        verbose=1
+        verbose=1,
     )
 
     # Save the trained model
@@ -543,8 +593,7 @@ def main():
 
         # Scale test data
         df_test_scaled = pd.DataFrame(
-            scaler.transform(df_test_stn.values),
-            columns=df_test_stn.columns
+            scaler.transform(df_test_stn.values), columns=df_test_stn.columns
         )
 
         # Create sequences for testing
@@ -552,10 +601,12 @@ def main():
             df_test_scaled,
             window_size=WINDOW_SIZE,
             horizon=HORIZON,
-            target_col=TARGET_COL
+            target_col=TARGET_COL,
         )
         if len(X_test) == 0:
-            print(f"Not enough test data to form sequences for station: {station}. Skipping.")
+            print(
+                f"Not enough test data to form sequences for station: {station}. Skipping."
+            )
             continue
 
         # Predict on test data
@@ -563,14 +614,16 @@ def main():
 
         # Invert scaling for true and predicted values
         df_cols = list(df_test_stn.columns)  # same order
-        y_test_inv  = inverse_transform_predictions(y_test, scaler, df_cols, TARGET_COL)
-        y_pred_inv = inverse_transform_predictions(y_test_pred_scaled, scaler, df_cols, TARGET_COL)
-        
+        y_test_inv = inverse_transform_predictions(y_test, scaler, df_cols, TARGET_COL)
+        y_pred_inv = inverse_transform_predictions(
+            y_test_pred_scaled, scaler, df_cols, TARGET_COL
+        )
+
         # Compute metrics (averaged across the forecast horizon)
-        mse = mean_squared_error(y_test_inv, y_pred_inv, multioutput='uniform_average')
-        mae = mean_absolute_error(y_test_inv, y_pred_inv, multioutput='uniform_average')
+        mse = mean_squared_error(y_test_inv, y_pred_inv, multioutput="uniform_average")
+        mae = mean_absolute_error(y_test_inv, y_pred_inv, multioutput="uniform_average")
         rmse = math.sqrt(mse)
-        r2 = r2_score(y_test_inv, y_pred_inv, multioutput='uniform_average')
+        r2 = r2_score(y_test_inv, y_pred_inv, multioutput="uniform_average")
 
         print(f"\n--- Test Metrics for station: {station} ---")
         print(f"MAE:  {mae:.4f}")
@@ -586,6 +639,7 @@ def main():
             plot_scatter_day(y_test_inv, y_pred_inv, day_idx, station)
 
     print("\nAll done. End of script.")
+
 
 if __name__ == "__main__":
     main()
