@@ -280,11 +280,15 @@ def plot_training_history(history, save_path):
 # 4. Per-Farm Training Function
 # -------------------------------
 def train_for_station(station_folder):
-    """Train and evaluate a rainfall model for a single farm."""
+    """Train and evaluate a rainfall model for a single farm.
+
+    Returns a dictionary with the final training and validation metrics
+    for that farm.
+    """
     df_station = load_station_data(station_folder)
     if df_station.empty:
         print(f"No data for station {station_folder}. Skipping.")
-        return
+        return None
 
     df_train, df_test = split_test_by_date(
         df_station,
@@ -299,7 +303,7 @@ def train_for_station(station_folder):
 
     if df_train.empty:
         print(f"No training data for station {station_folder}. Skipping.")
-        return
+        return None
 
     scaler = StandardScaler()
     scaler.fit(df_train.values)
@@ -365,6 +369,16 @@ def train_for_station(station_folder):
     plot_history_path = os.path.join(station_plot_dir, "training_history.png")
     plot_training_history(history, plot_history_path)
 
+    metrics_summary = {
+        "farm": station_folder,
+        "train_loss": history.history.get("loss", [None])[-1],
+        "train_mae": history.history.get("mae", [None])[-1],
+        "train_r2": history.history.get("r2_keras", [None])[-1],
+        "val_loss": history.history.get("val_loss", [None])[-1],
+        "val_mae": history.history.get("val_mae", [None])[-1],
+        "val_r2": history.history.get("val_r2_keras", [None])[-1],
+    }
+
     if not df_test.empty:
         df_test_scaled = pd.DataFrame(
             scaler.transform(df_test.values), columns=df_test.columns
@@ -409,7 +423,7 @@ def train_for_station(station_folder):
                 f"Not enough test data to form sequences for station: {station_folder}. Skipping evaluation."
             )
 
-
+    return metrics_summary
 # -------------------------------
 # 4. Main Script
 # -------------------------------
@@ -418,8 +432,17 @@ def main():
     tf.random.set_seed(RANDOM_SEED)
 
     if TRAIN_PER_FARM:
+        metrics_list = []
         for station in STATION_FOLDERS:
-            train_for_station(station)
+            result = train_for_station(station)
+            if result:
+                metrics_list.append(result)
+
+        summary_df = pd.DataFrame(metrics_list)
+        summary_path = os.path.join(PLOTS_DIR, "final_training_metrics.csv")
+        summary_df.to_csv(summary_path, index=False)
+        print(f"\nSummary metrics saved to {summary_path}")
+
         print("\nAll done. End of script.")
         return
 
