@@ -11,7 +11,6 @@ import os
 import math
 import numpy as np
 import pandas as pd
-from datetime import datetime
 
 # Concurrency
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -27,7 +26,6 @@ os.environ.setdefault("TF_NUM_INTEROP_THREADS", "2")
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "2")
 
 # TensorFlow / Keras
-import generate_scatter_report
 from model_rainfall import MAX_WORKERS
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
@@ -97,7 +95,7 @@ TEST_RATIO = 0.15
 # -------------------------------
 # Set the year range of data to include.  Use ``None`` to disable a bound.
 # These are applied before splitting the data into train/val/test sets.
-START_YEAR = 2014  # e.g. 2018
+START_YEAR = 2000  # e.g. 2018
 END_YEAR = 2025  # e.g. 2022
 
 # Input sequence length (days to look back)
@@ -463,7 +461,7 @@ def train_for_station(station_folder):
         verbose=0,
     )
 
-    model_path = os.path.join(MODELS_DIR, f"{station_folder}_model_lstm.h5")
+    model_path = os.path.join(MODELS_DIR, f"{station_folder}_model_lstm.keras")
     model.save(model_path)
     print(f"Model saved to {model_path}")
 
@@ -657,9 +655,19 @@ def main():
         print(f"\nTraining/validation metrics saved to {train_val_path}")
         print(f"Test metrics saved to {test_path}")
 
+        # Generate DOCX reports for test, train, and val
+        for dtype in ["test", "train", "val"]:
+            report_path = os.path.join(
+                "reports", f"scatter_report_{dtype}_{START_YEAR}-{END_YEAR}.docx"
+            )
+            print(f"Generating {dtype} report: {report_path}")
+            generate_scatter_report(
+                plots_dir=PLOTS_DIR, output_path=report_path, dataset_type=dtype
+            )
         print("\nAll done. End of script.")
         return
 
+    # if not TRAIN_PER_FARM: Generate combined model
     train_list = []
     val_list = []
     test_data_by_station = {}
@@ -897,10 +905,6 @@ def main():
     test_df.to_csv(test_path, index=False)
     print(f"\nTraining/validation metrics saved to {train_val_path}")
     print(f"Test metrics saved to {test_path}")
-
-    generate_scatter_report(
-        plots_dir=PLOTS_DIR, output_path=f"scatter_report_{START_YEAR}-{END_YEAR}.docx"
-    )
     print("\nAll done. End of script.")
 
 
