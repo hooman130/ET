@@ -229,6 +229,16 @@ def inverse_transform_predictions(y_scaled, scaler, df_columns, target_col):
     return target_inv
 
 
+def compute_metrics(y_true, y_pred):
+    """Return MAE, MSE, RMSE, R² average and per-horizon array."""
+    mse = mean_squared_error(y_true, y_pred, multioutput="uniform_average")
+    mae = mean_absolute_error(y_true, y_pred, multioutput="uniform_average")
+    rmse = math.sqrt(mse)
+    r2_avg = r2_score(y_true, y_pred, multioutput="uniform_average")
+    r2_each = r2_score(y_true, y_pred, multioutput="raw_values")
+    return mae, mse, rmse, r2_avg, r2_each
+
+
 def plot_time_series_predictions(y_true, y_pred, horizon, station_folder):
     """
     Plots actual vs predicted Rainfall for each day in the forecast horizon (day+1, day+2, day+3),
@@ -400,6 +410,17 @@ def train_for_station(station_folder):
     plot_history_path = os.path.join(station_plot_dir, "training_history.png")
     plot_training_history(history, plot_history_path)
 
+    # --- Metrics on training set ---
+    y_train_pred_scaled = model.predict(X_train)
+    df_cols = list(df_train.columns)
+    y_train_inv = inverse_transform_predictions(y_train, scaler, df_cols, TARGET_COL)
+    y_train_pred_inv = inverse_transform_predictions(
+        y_train_pred_scaled, scaler, df_cols, TARGET_COL
+    )
+    train_mae, train_mse, train_rmse, train_r2_avg, train_r2_each = compute_metrics(
+        y_train_inv, y_train_pred_inv
+    )
+
     # --------- Calculate validation metrics over whole val set ----------
     y_val_pred_scaled = model.predict(X_val)
     df_cols = list(df_val.columns)
@@ -407,30 +428,35 @@ def train_for_station(station_folder):
     y_val_pred_inv = inverse_transform_predictions(
         y_val_pred_scaled, scaler, df_cols, TARGET_COL
     )
-    val_mse = mean_squared_error(
-        y_val_inv, y_val_pred_inv, multioutput="uniform_average"
+    val_mae, val_mse, val_rmse, val_r2_avg, val_r2_each = compute_metrics(
+        y_val_inv, y_val_pred_inv
     )
-    val_mae = mean_absolute_error(
-        y_val_inv, y_val_pred_inv, multioutput="uniform_average"
-    )
-    val_rmse = math.sqrt(val_mse)
-    val_r2 = r2_score(y_val_inv, y_val_pred_inv, multioutput="uniform_average")
 
     metrics_summary = {
         "farm": station_folder,
         "train_loss": history.history.get("loss", [None])[-1],
-        "train_mae": history.history.get("mae", [None])[-1],
-        "train_r2": history.history.get("r2_keras", [None])[-1],
-        # Validation metrics: computed on the full val set
+        "train_mae": train_mae,
+        "train_rmse": train_rmse,
+        "train_r2_avg": train_r2_avg,
+        "train_r2_day1": train_r2_each[0],
+        "train_r2_day2": train_r2_each[1],
+        "train_r2_day3": train_r2_each[2],
+        # Validation metrics
         "val_loss": val_mse,
         "val_mae": val_mae,
         "val_rmse": val_rmse,
-        "val_r2": val_r2,
+        "val_r2_avg": val_r2_avg,
+        "val_r2_day1": val_r2_each[0],
+        "val_r2_day2": val_r2_each[1],
+        "val_r2_day3": val_r2_each[2],
         # Placeholders for test metrics (filled below if available)
         "test_mae": None,
         "test_mse": None,
         "test_rmse": None,
-        "test_r2": None,
+        "test_r2_avg": None,
+        "test_r2_day1": None,
+        "test_r2_day2": None,
+        "test_r2_day3": None,
     }
 
     if not df_test.empty:
@@ -457,20 +483,15 @@ def train_for_station(station_folder):
                 y_test_pred_scaled, scaler, df_cols, TARGET_COL
             )
 
-            mse = mean_squared_error(
-                y_test_inv, y_pred_inv, multioutput="uniform_average"
+            mae, mse, rmse, r2_avg, r2_each = compute_metrics(
+                y_test_inv, y_pred_inv
             )
-            mae = mean_absolute_error(
-                y_test_inv, y_pred_inv, multioutput="uniform_average"
-            )
-            rmse = math.sqrt(mse)
-            r2 = r2_score(y_test_inv, y_pred_inv, multioutput="uniform_average")
 
             print(f"\n--- Test Metrics for station: {station_folder} ---")
             print(f"MAE:  {mae:.4f}")
             print(f"MSE:  {mse:.4f}")
             print(f"RMSE: {rmse:.4f}")
-            print(f"R²:   {r2:.4f}")
+            print(f"R²:   {r2_avg:.4f}")
 
             plot_time_series_predictions(
                 y_test_inv, y_pred_inv, HORIZON, station_folder
@@ -481,7 +502,10 @@ def train_for_station(station_folder):
             metrics_summary["test_mae"] = mae
             metrics_summary["test_mse"] = mse
             metrics_summary["test_rmse"] = rmse
-            metrics_summary["test_r2"] = r2
+            metrics_summary["test_r2_avg"] = r2_avg
+            metrics_summary["test_r2_day1"] = r2_each[0]
+            metrics_summary["test_r2_day2"] = r2_each[1]
+            metrics_summary["test_r2_day3"] = r2_each[2]
 
         else:
             print(
@@ -515,9 +539,43 @@ def main():
                     print(f"Training failed for {station}: {exc}")
 
         summary_df = pd.DataFrame(metrics_list).round(4)
-        summary_path = os.path.join(PLOTS_DIR, "final_training_metrics.csv")
-        summary_df.to_csv(summary_path, index=False)
-        print(f"\nSummary metrics saved to {summary_path}")
+        train_val_cols = [
+            "farm",
+            "train_loss",
+            "train_mae",
+            "train_rmse",
+            "train_r2_avg",
+            "train_r2_day1",
+            "train_r2_day2",
+            "train_r2_day3",
+            "val_loss",
+            "val_mae",
+            "val_rmse",
+            "val_r2_avg",
+            "val_r2_day1",
+            "val_r2_day2",
+            "val_r2_day3",
+        ]
+        test_cols = [
+            "farm",
+            "test_mae",
+            "test_mse",
+            "test_rmse",
+            "test_r2_avg",
+            "test_r2_day1",
+            "test_r2_day2",
+            "test_r2_day3",
+        ]
+
+        train_val_df = summary_df[train_val_cols]
+        test_df = summary_df[test_cols]
+
+        train_val_path = os.path.join(PLOTS_DIR, "training_validation_metrics.csv")
+        test_path = os.path.join(PLOTS_DIR, "test_metrics.csv")
+        train_val_df.to_csv(train_val_path, index=False)
+        test_df.to_csv(test_path, index=False)
+        print(f"\nTraining/validation metrics saved to {train_val_path}")
+        print(f"Test metrics saved to {test_path}")
 
         print("\nAll done. End of script.")
         return
@@ -635,62 +693,113 @@ def main():
     plot_training_history(history, plot_history_path)
     print(f"Training history plot saved to {plot_history_path}")
 
-    # G) Evaluate on each station's test set separately
+    # ----- Training and validation metrics -----
+    y_train_pred_scaled = model.predict(X_train)
+    df_cols = list(df_train_all.columns)
+    y_train_inv = inverse_transform_predictions(y_train, scaler, df_cols, TARGET_COL)
+    y_train_pred_inv = inverse_transform_predictions(
+        y_train_pred_scaled, scaler, df_cols, TARGET_COL
+    )
+    train_mae, train_mse, train_rmse, train_r2_avg, train_r2_each = compute_metrics(
+        y_train_inv, y_train_pred_inv
+    )
+
+    y_val_pred_scaled = model.predict(X_val)
+    y_val_inv = inverse_transform_predictions(y_val, scaler, df_cols, TARGET_COL)
+    y_val_pred_inv = inverse_transform_predictions(
+        y_val_pred_scaled, scaler, df_cols, TARGET_COL
+    )
+    val_mae, val_mse, val_rmse, val_r2_avg, val_r2_each = compute_metrics(
+        y_val_inv, y_val_pred_inv
+    )
+
+    train_val_metrics = {
+        "farm": "combined",
+        "train_loss": history.history.get("loss", [None])[-1],
+        "train_mae": train_mae,
+        "train_rmse": train_rmse,
+        "train_r2_avg": train_r2_avg,
+        "train_r2_day1": train_r2_each[0],
+        "train_r2_day2": train_r2_each[1],
+        "train_r2_day3": train_r2_each[2],
+        "val_loss": val_mse,
+        "val_mae": val_mae,
+        "val_rmse": val_rmse,
+        "val_r2_avg": val_r2_avg,
+        "val_r2_day1": val_r2_each[0],
+        "val_r2_day2": val_r2_each[1],
+        "val_r2_day3": val_r2_each[2],
+    }
+
+    test_metrics_list = []
+
+    # ----- Evaluate on each station's test set -----
     for station in STATION_FOLDERS:
         df_test_stn = test_data_by_station.get(station, pd.DataFrame())
         if df_test_stn.empty:
             print(f"No test data for station: {station}. Skipping.")
             continue
 
-        # Scale test data
         df_test_scaled = pd.DataFrame(
             scaler.transform(df_test_stn.values), columns=df_test_stn.columns
         )
 
-        # Create sequences for testing
         X_test, y_test = create_sequences(
             df_test_scaled,
             window_size=WINDOW_SIZE,
             horizon=HORIZON,
             target_col=TARGET_COL,
         )
-        print(
-            f"{station} sequences -> Test: {len(X_test)}"
-        )
+        print(f"{station} sequences -> Test: {len(X_test)}")
         if len(X_test) == 0:
             print(
                 f"Not enough test data to form sequences for station: {station}. Skipping."
             )
             continue
 
-        # Predict on test data
         y_test_pred_scaled = model.predict(X_test)
 
-        # Invert scaling for true and predicted values
-        df_cols = list(df_test_stn.columns)  # same order
+        df_cols = list(df_test_stn.columns)
         y_test_inv = inverse_transform_predictions(y_test, scaler, df_cols, TARGET_COL)
         y_pred_inv = inverse_transform_predictions(
             y_test_pred_scaled, scaler, df_cols, TARGET_COL
         )
 
-        # Compute metrics (averaged across the forecast horizon)
-        mse = mean_squared_error(y_test_inv, y_pred_inv, multioutput="uniform_average")
-        mae = mean_absolute_error(y_test_inv, y_pred_inv, multioutput="uniform_average")
-        rmse = math.sqrt(mse)
-        r2 = r2_score(y_test_inv, y_pred_inv, multioutput="uniform_average")
+        mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
         print(f"\n--- Test Metrics for station: {station} ---")
         print(f"MAE:  {mae:.4f}")
         print(f"MSE:  {mse:.4f}")
         print(f"RMSE: {rmse:.4f}")
-        print(f"R²:   {r2:.4f}")
+        print(f"R²:   {r2_avg:.4f}")
 
-        # Plot time-series predictions vs. actual rainfall
         plot_time_series_predictions(y_test_inv, y_pred_inv, HORIZON, station)
 
-        # Plot scatter for each day in the forecast horizon
         for day_idx in range(HORIZON):
             plot_scatter_day(y_test_inv, y_pred_inv, day_idx, station)
+
+        test_metrics_list.append(
+            {
+                "farm": station,
+                "test_mae": mae,
+                "test_mse": mse,
+                "test_rmse": rmse,
+                "test_r2_avg": r2_avg,
+                "test_r2_day1": r2_each[0],
+                "test_r2_day2": r2_each[1],
+                "test_r2_day3": r2_each[2],
+            }
+        )
+
+    train_val_df = pd.DataFrame([train_val_metrics]).round(4)
+    test_df = pd.DataFrame(test_metrics_list).round(4)
+
+    train_val_path = os.path.join(PLOTS_DIR, "training_validation_metrics.csv")
+    test_path = os.path.join(PLOTS_DIR, "test_metrics.csv")
+    train_val_df.to_csv(train_val_path, index=False)
+    test_df.to_csv(test_path, index=False)
+    print(f"\nTraining/validation metrics saved to {train_val_path}")
+    print(f"Test metrics saved to {test_path}")
 
     print("\nAll done. End of script.")
 
