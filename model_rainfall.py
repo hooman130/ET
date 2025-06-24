@@ -73,8 +73,8 @@ TEST_RATIO = 0.15
 # -------------------------------
 # Define the year range to use.  Set to ``None`` to omit the bound.
 # The filter is applied prior to splitting the data.
-START_YEAR = None  # e.g. 2018
-END_YEAR = None    # e.g. 2022
+START_YEAR = 2010  # e.g. 2018
+END_YEAR = 2025    # e.g. 2022
 
 # Input sequence length (days to look back)
 WINDOW_SIZE = 24
@@ -93,7 +93,7 @@ RANDOM_SEED = 42
 MODEL_PATH = "model_rain_lstm.h5"
 
 # Where to save plots and results
-PLOTS_DIR = "plots_test_2years_rainfall"
+PLOTS_DIR = "plots_test_rainfall" if START_YEAR is None else f"plots_test_rainfall_{START_YEAR}-{END_YEAR}"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 

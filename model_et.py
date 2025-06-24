@@ -83,8 +83,8 @@ TEST_RATIO = 0.15
 # -------------------------------
 # Set the year range of data to include.  Use ``None`` to disable a bound.
 # These are applied before splitting the data into train/val/test sets.
-START_YEAR = None  # e.g. 2018
-END_YEAR = None    # e.g. 2022
+START_YEAR = 2010  # e.g. 2018
+END_YEAR = 2025    # e.g. 2022
 
 # Input sequence length (days to look back)
 WINDOW_SIZE = 24
@@ -103,7 +103,7 @@ RANDOM_SEED = 42
 MODEL_PATH = "model_lstm.h5"
 
 # Where to save plots and results
-PLOTS_DIR = "plots_test_ET"
+PLOTS_DIR = "plots_test_ET" if START_YEAR is None else f"plots_test_ET_{START_YEAR}-{END_YEAR}"
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
@@ -599,7 +599,7 @@ def main():
     model.compile(
         loss="mse",
         optimizer=Adam(learning_rate=0.001),
-        metrics=["mae", r2_keras],  # add custom R²
+        metrics=["mae"],  # add custom R²
     )
 
     early_stop = EarlyStopping(
@@ -613,7 +613,7 @@ def main():
         epochs=50,
         batch_size=32,
         callbacks=[early_stop],
-        verbose=1,
+        verbose=0,
     )
 
     # Save model
