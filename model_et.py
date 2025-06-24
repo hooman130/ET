@@ -279,14 +279,31 @@ def plot_time_series_predictions(y_true, y_pred, horizon, station_folder):
     plt.close()
 
 
-def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
-    """
-    Creates a scatter plot: x=actual, y=predicted, for a specific day_idx in horizon.
-    Saves as scatter_day{day_idx+1}.png in station's folder.
+def plot_scatter_day(y_true, y_pred, day_idx, station_folder, dataset_type="test"):
+    """Create a scatter plot for one forecast day.
+
+    Parameters
+    ----------
+    y_true, y_pred : array-like
+        Actual and predicted values.
+    day_idx : int
+        Forecast day index (0-based).
+    station_folder : str
+        Folder where the plot will be saved.
+    dataset_type : {"train", "val", "test"}, optional
+        Indicates which data split is being plotted. Defaults to "test".
     """
     station_plot_dir = os.path.join(PLOTS_DIR, station_folder)
     os.makedirs(station_plot_dir, exist_ok=True)
-    save_path = os.path.join(station_plot_dir, f"scatter_day{day_idx+1}.png")
+
+    if dataset_type == "test":
+        filename = f"scatter_day{day_idx+1}.png"
+        title_prefix = "Scatter Plot"
+    else:
+        filename = f"{dataset_type}_scatter_day{day_idx+1}.png"
+        title_prefix = f"{dataset_type.capitalize()} Scatter"
+
+    save_path = os.path.join(station_plot_dir, filename)
 
     plt.figure(figsize=(6, 6))
     plt.scatter(
@@ -296,7 +313,7 @@ def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
         color="tab:blue",
         label="Predictions",
     )
-    plt.title(f"Scatter Plot: Day +{day_idx+1}")
+    plt.title(f"{title_prefix}: Day +{day_idx+1}")
     plt.xlabel("Actual ET")
     plt.ylabel("Predicted ET")
 
@@ -469,6 +486,15 @@ def train_for_station(station_folder):
         y_train_inv, y_train_pred_inv
     )
 
+    for day_idx in range(HORIZON):
+        plot_scatter_day(
+            y_train_inv,
+            y_train_pred_inv,
+            day_idx,
+            station_folder,
+            dataset_type="train",
+        )
+
     # --------- Calculate validation metrics over whole val set ----------
     y_val_pred_scaled = model.predict(X_val)
     df_cols = list(df_val.columns)
@@ -479,6 +505,15 @@ def train_for_station(station_folder):
     val_mae, val_mse, val_rmse, val_r2_avg, val_r2_each = compute_metrics(
         y_val_inv, y_val_pred_inv
     )
+
+    for day_idx in range(HORIZON):
+        plot_scatter_day(
+            y_val_inv,
+            y_val_pred_inv,
+            day_idx,
+            station_folder,
+            dataset_type="val",
+        )
 
     metrics_summary = {
         "farm": station_folder,
@@ -753,6 +788,15 @@ def main():
         y_train_inv, y_train_pred_inv
     )
 
+    for day_idx in range(HORIZON):
+        plot_scatter_day(
+            y_train_inv,
+            y_train_pred_inv,
+            day_idx,
+            "combined",
+            dataset_type="train",
+        )
+
     y_val_pred_scaled = model.predict(X_val)
     y_val_inv = inverse_transform_predictions(y_val, scaler, df_cols, TARGET_COL)
     y_val_pred_inv = inverse_transform_predictions(
@@ -761,6 +805,15 @@ def main():
     val_mae, val_mse, val_rmse, val_r2_avg, val_r2_each = compute_metrics(
         y_val_inv, y_val_pred_inv
     )
+
+    for day_idx in range(HORIZON):
+        plot_scatter_day(
+            y_val_inv,
+            y_val_pred_inv,
+            day_idx,
+            "combined",
+            dataset_type="val",
+        )
 
     train_val_metrics = {
         "farm": "combined",
