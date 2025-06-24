@@ -50,8 +50,8 @@ STATION_FOLDERS = [
     "Kuilima_Farms",
     "Cabaero_Farms",  # Corresponds to Cabaero Farms (lat: 20.8425, lng: -156.3471)
     "Kupaa_Farms",  # Corresponds to Kupa'a Farms (lat: 20.7658, lng: -156.3513)
-    "MAO_Organic_Farms_Original",  # From MA'O Organic Farms (original site)
-    "MAO_Organic_Farms_New",  # From MA'O Organic Farms (new site)
+    "MAO_Organic_Farms_(new_site)",  # From MA'O Organic Farms (original site)
+    "MAO_Organic_Farms_(original_site)",  # From MA'O Organic Farms (new site)
     "2K_Farm_LLC",  # From 2K Farm LLC
     "Wong_Hon_Hin_Inc",  # From Wong Hon Hin Inc
     "Hawaii_Taro_Farm_LLC",  # From Hawaii Taro Farm, LLC
@@ -85,7 +85,7 @@ TEST_RATIO = 0.15
 # Define the year range to use.  Set to ``None`` to omit the bound.
 # The filter is applied prior to splitting the data.
 START_YEAR = 2014  # e.g. 2018
-END_YEAR = 2025    # e.g. 2022
+END_YEAR = 2025  # e.g. 2022
 
 # Input sequence length (days to look back)
 WINDOW_SIZE = 24
@@ -105,7 +105,11 @@ RANDOM_SEED = 42
 MODEL_PATH = "model_rain_lstm.h5"
 
 # Where to save plots and results
-PLOTS_DIR = "plots_test_rainfall" if START_YEAR is None else f"plots_test_rainfall_{START_YEAR}-{END_YEAR}"
+PLOTS_DIR = (
+    "plots_test_rainfall"
+    if START_YEAR is None
+    else f"plots_test_rainfall_{START_YEAR}-{END_YEAR}"
+)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
@@ -299,7 +303,7 @@ def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
 
     # Compute metrics for this forecast day
     mae_d, mse_d, rmse_d, r2_d, _ = compute_metrics(
-        y_true[:, day_idx: day_idx + 1], y_pred[:, day_idx: day_idx + 1]
+        y_true[:, day_idx : day_idx + 1], y_pred[:, day_idx : day_idx + 1]
     )
     metrics_text = (
         f"MAE: {mae_d:.2f}\nMSE: {mse_d:.2f}\nRMSE: {rmse_d:.2f}\nR²: {r2_d:.2f}"
@@ -403,9 +407,7 @@ def train_for_station(station_folder):
         horizon=HORIZON,
         target_col=TARGET_COL,
     )
-    print(
-        f"{station_folder} sequences -> Train: {len(X_train)}, Val: {len(X_val)}"
-    )
+    print(f"{station_folder} sequences -> Train: {len(X_train)}, Val: {len(X_val)}")
 
     num_features = df_train.shape[1]
     model = Sequential()
@@ -432,7 +434,7 @@ def train_for_station(station_folder):
         verbose=1,
     )
 
-    model_path = os.path.join(MODELS_DIR, f"{station_folder}_model_rain_lstm.h5")
+    model_path = os.path.join(MODELS_DIR, f"{station_folder}_model_rain_lstm.keras")
     model.save(model_path)
     print(f"Model saved to {model_path}")
 
@@ -504,9 +506,7 @@ def train_for_station(station_folder):
             horizon=HORIZON,
             target_col=TARGET_COL,
         )
-        print(
-            f"{station_folder} sequences -> Test: {len(X_test)}"
-        )
+        print(f"{station_folder} sequences -> Test: {len(X_test)}")
         if len(X_test) > 0:
             y_test_pred_scaled = model.predict(X_test)
 
@@ -518,9 +518,7 @@ def train_for_station(station_folder):
                 y_test_pred_scaled, scaler, df_cols, TARGET_COL
             )
 
-            mae, mse, rmse, r2_avg, r2_each = compute_metrics(
-                y_test_inv, y_pred_inv
-            )
+            mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
             print(f"\n--- Test Metrics for station: {station_folder} ---")
             print(f"MAE:  {mae:.4f}")
@@ -684,9 +682,7 @@ def main():
         df_val_scaled, window_size=WINDOW_SIZE, horizon=HORIZON, target_col=TARGET_COL
     )
 
-    print(
-        f"Combined sequences -> Train: {len(X_train)}, Val: {len(X_val)}"
-    )
+    print(f"Combined sequences -> Train: {len(X_train)}, Val: {len(X_val)}")
 
     # F) Build & train LSTM model with custom R² metric
     num_features = df_train_all.shape[1]

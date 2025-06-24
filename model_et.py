@@ -16,6 +16,7 @@ from datetime import datetime
 # Concurrency
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from generate_scatter_report import generate_scatter_report
+
 # Scikit-learn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -62,8 +63,8 @@ STATION_FOLDERS = [
     "Kuilima_Farms",
     "Cabaero_Farms",  # Corresponds to Cabaero Farms (lat: 20.8425, lng: -156.3471)
     "Kupaa_Farms",  # Corresponds to Kupa'a Farms (lat: 20.7658, lng: -156.3513)
-    "MAO_Organic_Farms_Original",  # From MA'O Organic Farms (original site)
-    "MAO_Organic_Farms_New",  # From MA'O Organic Farms (new site)
+    "MAO_Organic_Farms_(new_site)",  # From MA'O Organic Farms (original site)
+    "MAO_Organic_Farms_(original_site)",  # From MA'O Organic Farms (new site)
     "2K_Farm_LLC",  # From 2K Farm LLC
     "Wong_Hon_Hin_Inc",  # From Wong Hon Hin Inc
     "Hawaii_Taro_Farm_LLC",  # From Hawaii Taro Farm, LLC
@@ -97,7 +98,7 @@ TEST_RATIO = 0.15
 # Set the year range of data to include.  Use ``None`` to disable a bound.
 # These are applied before splitting the data into train/val/test sets.
 START_YEAR = 2014  # e.g. 2018
-END_YEAR = 2025    # e.g. 2022
+END_YEAR = 2025  # e.g. 2022
 
 # Input sequence length (days to look back)
 WINDOW_SIZE = 24
@@ -110,7 +111,6 @@ MAX_WORKERS = 8  # Number of parallel processes for training
 # Target column name
 TARGET_COL = "ET (mm/day)"
 
-
 # Random seed for reproducibility
 RANDOM_SEED = 42
 
@@ -118,7 +118,9 @@ RANDOM_SEED = 42
 MODEL_PATH = "model_lstm.h5"
 
 # Where to save plots and results
-PLOTS_DIR = "plots_test_ET" if START_YEAR is None else f"plots_test_ET_{START_YEAR}-{END_YEAR}"
+PLOTS_DIR = (
+    "plots_test_ET" if START_YEAR is None else f"plots_test_ET_{START_YEAR}-{END_YEAR}"
+)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
@@ -331,7 +333,7 @@ def plot_scatter_day(y_true, y_pred, day_idx, station_folder, dataset_type="test
 
     # Compute metrics for this forecast day
     mae_d, mse_d, rmse_d, r2_d, _ = compute_metrics(
-        y_true[:, day_idx: day_idx + 1], y_pred[:, day_idx: day_idx + 1]
+        y_true[:, day_idx : day_idx + 1], y_pred[:, day_idx : day_idx + 1]
     )
     metrics_text = (
         f"MAE: {mae_d:.2f}\nMSE: {mse_d:.2f}\nRMSE: {rmse_d:.2f}\nR²: {r2_d:.2f}"
@@ -434,9 +436,7 @@ def train_for_station(station_folder):
         horizon=HORIZON,
         target_col=TARGET_COL,
     )
-    print(
-        f"{station_folder} sequences -> Train: {len(X_train)}, Val: {len(X_val)}"
-    )
+    print(f"{station_folder} sequences -> Train: {len(X_train)}, Val: {len(X_val)}")
 
     num_features = df_train.shape[1]
     model = Sequential()
@@ -553,9 +553,7 @@ def train_for_station(station_folder):
             horizon=HORIZON,
             target_col=TARGET_COL,
         )
-        print(
-            f"{station_folder} sequences -> Test: {len(X_test)}"
-        )
+        print(f"{station_folder} sequences -> Test: {len(X_test)}")
         if len(X_test) > 0:
             y_test_pred_scaled = model.predict(X_test)
 
@@ -567,9 +565,7 @@ def train_for_station(station_folder):
                 y_test_pred_scaled, scaler, df_cols, TARGET_COL
             )
 
-            mae, mse, rmse, r2_avg, r2_each = compute_metrics(
-                y_test_inv, y_pred_inv
-            )
+            mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
             print(f"\n--- Test Metrics for station: {station_folder} ---")
             print(f"MAE:  {mae:.4f}")
@@ -698,7 +694,7 @@ def main():
         return
     df_train_all = pd.concat(train_list, ignore_index=True)
     print("Combined training shape:", df_train_all.shape)
-    
+
     # C) Scale the training data (MinMaxScaler or StandardScaler)
     scaler = StandardScaler()  # or StandardScaler()
     scaler.fit(df_train_all.values)
@@ -734,9 +730,7 @@ def main():
         df_val_scaled, window_size=WINDOW_SIZE, horizon=HORIZON, target_col=TARGET_COL
     )
 
-    print(
-        f"Combined sequences -> Train: {len(X_train)}, Val: {len(X_val)}"
-    )
+    print(f"Combined sequences -> Train: {len(X_train)}, Val: {len(X_val)}")
 
     # F) Build & train LSTM model with custom R² metric
     num_features = df_train_all.shape[1]
@@ -904,7 +898,9 @@ def main():
     print(f"\nTraining/validation metrics saved to {train_val_path}")
     print(f"Test metrics saved to {test_path}")
 
-    generate_scatter_report(plots_dir=PLOTS_DIR, output_path=f"scatter_report_{START_YEAR}-{END_YEAR}.docx")
+    generate_scatter_report(
+        plots_dir=PLOTS_DIR, output_path=f"scatter_report_{START_YEAR}-{END_YEAR}.docx"
+    )
     print("\nAll done. End of script.")
 
 

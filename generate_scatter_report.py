@@ -2,6 +2,7 @@ from docx import Document
 from docx.shared import Inches
 import os
 
+
 def generate_scatter_report(plots_dir, output_path="scatter_report.docx"):
     """Generate a DOCX report with scatter plots arranged in a table.
 
@@ -14,12 +15,16 @@ def generate_scatter_report(plots_dir, output_path="scatter_report.docx"):
     output_path : str, optional
         Path to the output DOCX file. Defaults to ``scatter_report.docx``.
     """
+    if not os.path.exists(plots_dir):
+        raise FileNotFoundError(f"Directory '{plots_dir}' not found")
 
     document = Document()
     document.add_heading("Forecast Scatter Plots", level=1)
 
     # Determine farms (subdirectories) sorted alphabetically
-    farms = [d for d in os.listdir(plots_dir) if os.path.isdir(os.path.join(plots_dir, d))]
+    farms = [
+        d for d in os.listdir(plots_dir) if os.path.isdir(os.path.join(plots_dir, d))
+    ]
     farms.sort()
 
     table = document.add_table(rows=1 + len(farms), cols=4)
@@ -45,13 +50,5 @@ def generate_scatter_report(plots_dir, output_path="scatter_report.docx"):
                 row_cells[day].text = "N/A"
 
     document.save(output_path)
-    return output_path
 
-if __name__ == "__main__":
-    year = "2000-2025"
-    PLOTS_DIR = f"plots_test_ET_{year}"
-    OUTPUT_FILE = f"scatter_plots_report_{year}.docx"
-    if not os.path.exists(PLOTS_DIR):
-        raise FileNotFoundError(f"Directory '{PLOTS_DIR}' not found")
-    generate_scatter_report(PLOTS_DIR, OUTPUT_FILE)
-    print(f"Report saved to {OUTPUT_FILE}")
+    print(f"Report saved to {output_path}")
