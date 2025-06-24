@@ -84,7 +84,7 @@ TEST_RATIO = 0.15
 # -------------------------------
 # Define the year range to use.  Set to ``None`` to omit the bound.
 # The filter is applied prior to splitting the data.
-START_YEAR = 2010  # e.g. 2018
+START_YEAR = 2014  # e.g. 2018
 END_YEAR = 2025    # e.g. 2022
 
 # Input sequence length (days to look back)

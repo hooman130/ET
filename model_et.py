@@ -95,7 +95,7 @@ TEST_RATIO = 0.15
 # -------------------------------
 # Set the year range of data to include.  Use ``None`` to disable a bound.
 # These are applied before splitting the data into train/val/test sets.
-START_YEAR = 2010  # e.g. 2018
+START_YEAR = 2014  # e.g. 2018
 END_YEAR = 2025    # e.g. 2022
 
 # Input sequence length (days to look back)
