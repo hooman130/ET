@@ -36,6 +36,10 @@ import tensorflow.keras.backend as K
 # Matplotlib
 import matplotlib.pyplot as plt
 
+# Apply a professional plotting style and consistent fonts
+plt.style.use("seaborn-v0_8-whitegrid")
+plt.rcParams.update({"font.size": 12, "axes.titlesize": 14, "axes.labelsize": 12})
+
 # -------------------------------
 # 1. Configuration
 # -------------------------------
@@ -271,16 +275,46 @@ def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
     save_path = os.path.join(station_plot_dir, f"scatter_day{day_idx+1}.png")
 
     plt.figure(figsize=(6, 6))
-    plt.scatter(y_true[:, day_idx], y_pred[:, day_idx], alpha=0.5, color="green")
+    plt.scatter(
+        y_true[:, day_idx],
+        y_pred[:, day_idx],
+        alpha=0.6,
+        color="tab:blue",
+        label="Predictions",
+    )
     plt.title(f"Scatter Plot: Day +{day_idx+1} Rainfall")
     plt.xlabel("Actual Rainfall")
     plt.ylabel("Predicted Rainfall")
 
-    # Optionally, add a y=x line for reference
+    # Add y=x reference line
     min_val = min(y_true[:, day_idx].min(), y_pred[:, day_idx].min())
     max_val = max(y_true[:, day_idx].max(), y_pred[:, day_idx].max())
-    plt.plot([min_val, max_val], [min_val, max_val], color="red", linestyle="--")
+    plt.plot(
+        [min_val, max_val],
+        [min_val, max_val],
+        color="red",
+        linestyle="--",
+        label="Ideal",
+    )
 
+    # Compute metrics for this forecast day
+    mae_d, mse_d, rmse_d, r2_d, _ = compute_metrics(
+        y_true[:, day_idx: day_idx + 1], y_pred[:, day_idx: day_idx + 1]
+    )
+    metrics_text = (
+        f"MAE: {mae_d:.2f}\nMSE: {mse_d:.2f}\nRMSE: {rmse_d:.2f}\nR²: {r2_d:.2f}"
+    )
+    plt.gca().text(
+        0.05,
+        0.95,
+        metrics_text,
+        transform=plt.gca().transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.5),
+    )
+
+    plt.legend()
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
