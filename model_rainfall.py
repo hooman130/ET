@@ -89,6 +89,7 @@ WINDOW_SIZE = 24
 # Forecast horizon (days to predict)
 HORIZON = 3
 
+MAX_WORKERS = 8  # Number of parallel processes for training
 # Target column name for rainfall forecasting
 TARGET_COL = "Rainfall (mm)"
 
@@ -524,7 +525,7 @@ def main():
 
     if TRAIN_PER_FARM:
         metrics_list = []
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {
                 executor.submit(train_for_station, station): station
                 for station in STATION_FOLDERS

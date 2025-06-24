@@ -26,6 +26,7 @@ os.environ.setdefault("TF_NUM_INTEROP_THREADS", "2")
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "2")
 
 # TensorFlow / Keras
+from model_rainfall import MAX_WORKERS
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Input
@@ -98,6 +99,8 @@ WINDOW_SIZE = 24
 
 # Forecast horizon (days to predict)
 HORIZON = 3
+
+MAX_WORKERS = 8  # Number of parallel processes for training
 
 # Target column name
 TARGET_COL = "ET (mm/day)"
@@ -535,7 +538,7 @@ def main():
 
     if TRAIN_PER_FARM:
         metrics_list = []
-        with ProcessPoolExecutor(max_workers=5) as executor:
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {
                 executor.submit(train_for_station, station): station
                 for station in STATION_FOLDERS
