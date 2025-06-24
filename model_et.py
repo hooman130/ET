@@ -13,10 +13,17 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
+# Concurrency
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 # Scikit-learn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+# Limit TensorFlow thread usage per process
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "2")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "2")
 
 # TensorFlow / Keras
 import tensorflow as tf
@@ -504,10 +511,19 @@ def main():
 
     if TRAIN_PER_FARM:
         metrics_list = []
-        for station in STATION_FOLDERS:
-            result = train_for_station(station)
-            if result:
-                metrics_list.append(result)
+        with ProcessPoolExecutor() as executor:
+            futures = {
+                executor.submit(train_for_station, station): station
+                for station in STATION_FOLDERS
+            }
+            for future in as_completed(futures):
+                station = futures[future]
+                try:
+                    result = future.result()
+                    if result:
+                        metrics_list.append(result)
+                except Exception as exc:
+                    print(f"Training failed for {station}: {exc}")
 
         summary_df = pd.DataFrame(metrics_list)
         summary_path = os.path.join(PLOTS_DIR, "final_training_metrics.csv")
