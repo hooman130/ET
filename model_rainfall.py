@@ -514,7 +514,7 @@ def main():
                 except Exception as exc:
                     print(f"Training failed for {station}: {exc}")
 
-        summary_df = pd.DataFrame(metrics_list)
+        summary_df = pd.DataFrame(metrics_list).round(4)
         summary_path = os.path.join(PLOTS_DIR, "final_training_metrics.csv")
         summary_df.to_csv(summary_path, index=False)
         print(f"\nSummary metrics saved to {summary_path}")
@@ -625,7 +625,7 @@ def main():
     print(f"Model saved to {MODEL_PATH}")
 
     # Save training history as CSV
-    history_df = pd.DataFrame(history.history)
+    history_df = pd.DataFrame(history.history).round(4)
     history_csv_path = os.path.join(PLOTS_DIR, "training_history_values.csv")
     history_df.to_csv(history_csv_path, index=False)
     print(f"Training history values saved to {history_csv_path}")
