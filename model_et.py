@@ -15,7 +15,7 @@ from datetime import datetime
 
 # Concurrency
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
+from generate_scatter_report import generate_scatter_report
 # Scikit-learn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -26,6 +26,7 @@ os.environ.setdefault("TF_NUM_INTEROP_THREADS", "2")
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "2")
 
 # TensorFlow / Keras
+import generate_scatter_report
 from model_rainfall import MAX_WORKERS
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
@@ -850,6 +851,7 @@ def main():
     print(f"\nTraining/validation metrics saved to {train_val_path}")
     print(f"Test metrics saved to {test_path}")
 
+    generate_scatter_report(plots_dir=PLOTS_DIR, output_path=f"scatter_report_{START_YEAR}-{END_YEAR}.docx")
     print("\nAll done. End of script.")
 
 
