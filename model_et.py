@@ -78,6 +78,14 @@ TRAIN_RATIO = 0.70
 VAL_RATIO = 0.15
 TEST_RATIO = 0.15
 
+# -------------------------------
+# Year Filtering
+# -------------------------------
+# Set the year range of data to include.  Use ``None`` to disable a bound.
+# These are applied before splitting the data into train/val/test sets.
+START_YEAR = None  # e.g. 2018
+END_YEAR = None    # e.g. 2022
+
 # Input sequence length (days to look back)
 WINDOW_SIZE = 24
 
@@ -134,6 +142,11 @@ def load_station_data(station_folder):
     if "Date" in df.columns:
         df["Date"] = pd.to_datetime(df["Date"])
         df.sort_values("Date", inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        if START_YEAR is not None:
+            df = df[df["Date"].dt.year >= START_YEAR]
+        if END_YEAR is not None:
+            df = df[df["Date"].dt.year <= END_YEAR]
         df.reset_index(drop=True, inplace=True)
     return df
 
@@ -303,10 +316,16 @@ def train_for_station(station_folder):
         return None
 
     df_train, df_val, df_test = split_by_percentages(df_station)
+    print(
+        f"{station_folder} data sizes -> Train: {len(df_train)}, Val: {len(df_val)}, Test: {len(df_test)}"
+    )
 
     df_train = feature_engineering(df_train)
     df_val = feature_engineering(df_val)
     df_test = feature_engineering(df_test)
+    print(
+        f"{station_folder} feature-engineered shapes -> Train: {df_train.shape}, Val: {df_val.shape}, Test: {df_test.shape}"
+    )
 
     if df_train.empty:
         print(f"No training data for station {station_folder}. Skipping.")
@@ -342,6 +361,9 @@ def train_for_station(station_folder):
         window_size=WINDOW_SIZE,
         horizon=HORIZON,
         target_col=TARGET_COL,
+    )
+    print(
+        f"{station_folder} sequences -> Train: {len(X_train)}, Val: {len(X_val)}"
     )
 
     num_features = df_train.shape[1]
@@ -425,6 +447,9 @@ def train_for_station(station_folder):
             horizon=HORIZON,
             target_col=TARGET_COL,
         )
+        print(
+            f"{station_folder} sequences -> Test: {len(X_test)}"
+        )
         if len(X_test) > 0:
             y_test_pred_scaled = model.predict(X_test)
 
@@ -503,10 +528,16 @@ def main():
             continue
 
         df_train_stn, df_val_stn, df_test_stn = split_by_percentages(df_station)
+        print(
+            f"{station} data sizes -> Train: {len(df_train_stn)}, Val: {len(df_val_stn)}, Test: {len(df_test_stn)}"
+        )
 
         df_train_stn = feature_engineering(df_train_stn)
         df_val_stn = feature_engineering(df_val_stn)
         df_test_stn = feature_engineering(df_test_stn)
+        print(
+            f"{station} feature-engineered shapes -> Train: {df_train_stn.shape}, Val: {df_val_stn.shape}, Test: {df_test_stn.shape}"
+        )
 
         if not df_train_stn.empty:
             train_list.append(df_train_stn)
@@ -520,7 +551,7 @@ def main():
         return
     df_train_all = pd.concat(train_list, ignore_index=True)
     print("Combined training shape:", df_train_all.shape)
-
+    
     # C) Scale the training data (MinMaxScaler or StandardScaler)
     scaler = StandardScaler()  # or StandardScaler()
     scaler.fit(df_train_all.values)
@@ -539,6 +570,9 @@ def main():
         )
     else:
         df_val_scaled = pd.DataFrame(columns=df_train_all.columns)
+    print(
+        f"Combined feature-engineered shapes -> Train: {df_train_all.shape}, Val: {df_val_all.shape}"
+    )
 
     # D) Create sequences for training and validation
     X_train, y_train = create_sequences(
@@ -553,8 +587,9 @@ def main():
         df_val_scaled, window_size=WINDOW_SIZE, horizon=HORIZON, target_col=TARGET_COL
     )
 
-    print("Training sequences:", len(X_train))
-    print("Validation sequences:", len(X_val))
+    print(
+        f"Combined sequences -> Train: {len(X_train)}, Val: {len(X_val)}"
+    )
 
     # F) Build & train LSTM model with custom R² metric
     num_features = df_train_all.shape[1]
@@ -614,6 +649,9 @@ def main():
             window_size=WINDOW_SIZE,
             horizon=HORIZON,
             target_col=TARGET_COL,
+        )
+        print(
+            f"{station} sequences -> Test: {len(X_test)}"
         )
         if len(X_test) == 0:
             print(
