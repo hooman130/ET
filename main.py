@@ -106,11 +106,10 @@ def fetch_daily_data_for_year(
         print(response.status_code, response.text)
         return pd.DataFrame(columns=["Date", "Value"])
     else:
-        data = response.json()  # Expected to be a dictionary with ISO-8601 date keys.
-
+        data = response.json()  # Expected to be a dictionary with ISO-8601 date key
         df = pd.DataFrame(list(data.items()), columns=["Date", "Value"])
-        # Convert Date column from string to datetime objects (date only).
-        df["Date"] = pd.to_datetime(df["Date"])
+        # Convert Date column to timezone-naive datetimes
+        df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
     return df
 
 
@@ -191,6 +190,8 @@ def main():
                 "ET (mm/day)",
                 "Ra (mm/day)"
             ]].copy()
+            # Convert Date to simple string YYYY-MM-DD
+            final_df["Date"] = pd.to_datetime(final_df["Date"]).dt.strftime("%Y-%m-%d")
             
             # Add columns for station details.
             final_df["Latitude"] = lat
