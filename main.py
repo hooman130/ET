@@ -95,7 +95,7 @@ def fetch_daily_data_for_year(lat, lng, datatype, start_date, end_date, aggregat
     else:
         data = response.json()  # Expected to be a dictionary with ISO-8601 date keys.
         df = pd.DataFrame(list(data.items()), columns=["Date", "Value"])
-        # Convert Date column from string to datetime objects.
+        # Convert Date column from string to datetime objects (date only).
         df["Date"] = pd.to_datetime(df["Date"])
     return df
 
@@ -158,11 +158,11 @@ def main():
             # Prepare final DataFrame with desired columns.
             df_merge = df_merge.rename(columns={"Ra_mm": "Ra (mm/day)"})
             final_df = df_merge[[
-                "Date", 
-                "Rainfall (mm)", 
-                "Tmax (°C)", 
-                "Tmin (°C)", 
-                "ET (mm/day)", 
+                "Date",
+                "Rainfall (mm)",
+                "Tmax (°C)",
+                "Tmin (°C)",
+                "ET (mm/day)",
                 "Ra (mm/day)"
             ]].copy()
             

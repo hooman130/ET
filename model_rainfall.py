@@ -186,9 +186,29 @@ def feature_engineering(df):
     if "Date" in df.columns:
         df["day"] = df["Date"].dt.day
         df["month"] = df["Date"].dt.month
+        # Cyclical month features for seasonality
+        df["month_sin"] = np.sin(2 * np.pi * df["Date"].dt.month / 12)
+        df["month_cos"] = np.cos(2 * np.pi * df["Date"].dt.month / 12)
+
+    # Handle erroneous extremely low Tmin values
+    if "Tmin (°C)" in df.columns:
+        df.loc[df["Tmin (°C)"] < -10, "Tmin (°C)"] = np.nan
+
+    # Log-transform rainfall to stabilize variance
+    if "Rainfall (mm)" in df.columns:
+        df = df[df["Rainfall (mm)"].notna()]
+        df["Rainfall (mm)"] = np.log1p(df["Rainfall (mm)"])
 
     # Drop columns we don't want in the model
-    drop_cols = ["Date", "Latitude", "Longitude", "Station"]
+    drop_cols = [
+        "Date",
+        "Latitude",
+        "Longitude",
+        "Station",
+        "month",
+        "RH (%)",
+        "Wind Speed (m/s)",
+    ]
     for col in drop_cols:
         if col in df.columns:
             df.drop(col, axis=1, inplace=True)
@@ -454,6 +474,8 @@ def train_for_station(station_folder):
     y_train_pred_inv = inverse_transform_predictions(
         y_train_pred_scaled, scaler, df_cols, TARGET_COL
     )
+    y_train_inv = np.expm1(y_train_inv)
+    y_train_pred_inv = np.expm1(y_train_pred_inv)
     train_mae, train_mse, train_rmse, train_r2_avg, train_r2_each = compute_metrics(
         y_train_inv, y_train_pred_inv
     )
@@ -465,6 +487,8 @@ def train_for_station(station_folder):
     y_val_pred_inv = inverse_transform_predictions(
         y_val_pred_scaled, scaler, df_cols, TARGET_COL
     )
+    y_val_inv = np.expm1(y_val_inv)
+    y_val_pred_inv = np.expm1(y_val_pred_inv)
     val_mae, val_mse, val_rmse, val_r2_avg, val_r2_each = compute_metrics(
         y_val_inv, y_val_pred_inv
     )
@@ -517,6 +541,8 @@ def train_for_station(station_folder):
             y_pred_inv = inverse_transform_predictions(
                 y_test_pred_scaled, scaler, df_cols, TARGET_COL
             )
+            y_test_inv = np.expm1(y_test_inv)
+            y_pred_inv = np.expm1(y_pred_inv)
 
             mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
@@ -731,6 +757,8 @@ def main():
     y_train_pred_inv = inverse_transform_predictions(
         y_train_pred_scaled, scaler, df_cols, TARGET_COL
     )
+    y_train_inv = np.expm1(y_train_inv)
+    y_train_pred_inv = np.expm1(y_train_pred_inv)
     train_mae, train_mse, train_rmse, train_r2_avg, train_r2_each = compute_metrics(
         y_train_inv, y_train_pred_inv
     )
@@ -740,6 +768,8 @@ def main():
     y_val_pred_inv = inverse_transform_predictions(
         y_val_pred_scaled, scaler, df_cols, TARGET_COL
     )
+    y_val_inv = np.expm1(y_val_inv)
+    y_val_pred_inv = np.expm1(y_val_pred_inv)
     val_mae, val_mse, val_rmse, val_r2_avg, val_r2_each = compute_metrics(
         y_val_inv, y_val_pred_inv
     )
@@ -795,6 +825,8 @@ def main():
         y_pred_inv = inverse_transform_predictions(
             y_test_pred_scaled, scaler, df_cols, TARGET_COL
         )
+        y_test_inv = np.expm1(y_test_inv)
+        y_pred_inv = np.expm1(y_pred_inv)
 
         mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
