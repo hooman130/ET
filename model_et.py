@@ -119,6 +119,7 @@ MODEL_PATH = "model_lstm.h5"
 PLOTS_DIR = (
     "plots_test_ET" if START_YEAR is None else f"plots_test_ET_{START_YEAR}-{END_YEAR}"
 )
+PLOTS_DIR = os.path.join("plots", PLOTS_DIR)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
@@ -257,7 +258,6 @@ def compute_metrics(y_true, y_pred):
     r2_avg = r2_score(y_true, y_pred, multioutput="uniform_average")
     r2_each = r2_score(y_true, y_pred, multioutput="raw_values")
     return mae, mse, rmse, r2_avg, r2_each
-
 
 def plot_time_series_predictions(y_true, y_pred, horizon, station_folder):
     """
