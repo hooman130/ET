@@ -108,8 +108,8 @@ def fetch_daily_data_for_year(
     else:
         data = response.json()  # Expected to be a dictionary with ISO-8601 date keys.
         df = pd.DataFrame(list(data.items()), columns=["Date", "Value"])
-        # Convert Date column from string to datetime objects.
-        df["Date"] = pd.to_datetime(df["Date"])
+        # Convert Date column from string to timezone-naive datetime objects.
+        df["Date"] = pd.to_datetime(df["Date"], utc=True).dt.tz_localize(None)
     return df
 
 
@@ -197,6 +197,7 @@ def main():
 
             # Prepare final DataFrame with desired columns.
             df_merge = df_merge.rename(columns={"Ra_mm": "Ra (mm/day)"})
+
             final_df = df_merge[
                 [
                     "Date",
@@ -209,7 +210,7 @@ def main():
                     "Ra (mm/day)",
                 ]
             ].copy()
-
+            
             # Add columns for station details.
             final_df["Latitude"] = lat
             final_df["Longitude"] = lng
