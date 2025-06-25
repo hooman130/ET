@@ -139,22 +139,28 @@ def main():
                 else f"{year}-12-31"
             )
             print(f"  Year: {year}, Range: {start_date} to {end_date}")
-            
+
             # Fetch daily data for rainfall, Tmax, and Tmin.
-            df_rain = fetch_daily_data_for_year(lat, lng, "rainfall", start_date, end_date)
-            df_tmax = fetch_daily_data_for_year(lat, lng, "temperature", start_date, end_date, aggregation="max")
-            df_tmin = fetch_daily_data_for_year(lat, lng, "temperature", start_date, end_date, aggregation="min")
-            
+            df_rain = fetch_daily_data_for_year(
+                lat, lng, "rainfall", start_date, end_date
+            )
+            df_tmax = fetch_daily_data_for_year(
+                lat, lng, "temperature", start_date, end_date, aggregation="max"
+            )
+            df_tmin = fetch_daily_data_for_year(
+                lat, lng, "temperature", start_date, end_date, aggregation="min"
+            )
+
             # Rename the "Value" columns.
             df_rain = df_rain.rename(columns={"Value": "Rainfall (mm)"})
             df_tmax = df_tmax.rename(columns={"Value": "Tmax (°C)"})
             df_tmin = df_tmin.rename(columns={"Value": "Tmin (°C)"})
-            
+
             # Merge the DataFrames on the "Date" column using an outer join.
             df_merge = pd.merge(df_rain, df_tmax, on="Date", how="outer")
             df_merge = pd.merge(df_merge, df_tmin, on="Date", how="outer")
             df_merge.sort_values("Date", inplace=True)
-            
+
             # Compute Tmean.
             df_merge["Tmean"] = (df_merge["Tmax (°C)"] + df_merge["Tmin (°C)"]) / 2.0
 
@@ -182,16 +188,18 @@ def main():
 
             # Prepare final DataFrame with desired columns.
             df_merge = df_merge.rename(columns={"Ra_mm": "Ra (mm/day)"})
-            
-            final_df = df_merge[[
-                "Date",
-                "Rainfall (mm)",
-                "Tmax (°C)",
-                "Tmin (°C)",
-                "ET (mm/day)",
-                "Ra (mm/day)"
-            ]].copy()
-            
+
+            final_df = df_merge[
+                [
+                    "Date",
+                    "Rainfall (mm)",
+                    "Tmax (°C)",
+                    "Tmin (°C)",
+                    "ET (mm/day)",
+                    "Ra (mm/day)",
+                ]
+            ].copy()
+
             # Add columns for station details.
             final_df["Latitude"] = lat
             final_df["Longitude"] = lng
