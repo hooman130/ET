@@ -200,7 +200,15 @@ def feature_engineering(df):
         df["Rainfall (mm)"] = np.log1p(df["Rainfall (mm)"])
 
     # Drop columns we don't want in the model
-    drop_cols = ["Date", "Latitude", "Longitude", "Station", "month"]
+    drop_cols = [
+        "Date",
+        "Latitude",
+        "Longitude",
+        "Station",
+        "month",
+        "RH (%)",
+        "Wind Speed (m/s)",
+    ]
     for col in drop_cols:
         if col in df.columns:
             df.drop(col, axis=1, inplace=True)
