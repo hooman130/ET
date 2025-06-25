@@ -181,7 +181,7 @@ def feature_engineering(df):
     """
     if df.empty:
         return df
-
+    
     # Extract day & month
     if "Date" in df.columns:
         df["day"] = df["Date"].dt.day
@@ -470,12 +470,14 @@ def train_for_station(station_folder):
     # --- Metrics on training set ---
     y_train_pred_scaled = model.predict(X_train)
     df_cols = list(df_train.columns)
+    
     y_train_inv = inverse_transform_predictions(y_train, scaler, df_cols, TARGET_COL)
     y_train_pred_inv = inverse_transform_predictions(
         y_train_pred_scaled, scaler, df_cols, TARGET_COL
     )
     y_train_inv = np.expm1(y_train_inv)
     y_train_pred_inv = np.expm1(y_train_pred_inv)
+    
     train_mae, train_mse, train_rmse, train_r2_avg, train_r2_each = compute_metrics(
         y_train_inv, y_train_pred_inv
     )
@@ -483,12 +485,14 @@ def train_for_station(station_folder):
     # --------- Calculate validation metrics over whole val set ----------
     y_val_pred_scaled = model.predict(X_val)
     df_cols = list(df_val.columns)
+
     y_val_inv = inverse_transform_predictions(y_val, scaler, df_cols, TARGET_COL)
     y_val_pred_inv = inverse_transform_predictions(
         y_val_pred_scaled, scaler, df_cols, TARGET_COL
     )
     y_val_inv = np.expm1(y_val_inv)
     y_val_pred_inv = np.expm1(y_val_pred_inv)
+
     val_mae, val_mse, val_rmse, val_r2_avg, val_r2_each = compute_metrics(
         y_val_inv, y_val_pred_inv
     )
@@ -535,6 +539,7 @@ def train_for_station(station_folder):
             y_test_pred_scaled = model.predict(X_test)
 
             df_cols = list(df_test.columns)
+
             y_test_inv = inverse_transform_predictions(
                 y_test, scaler, df_cols, TARGET_COL
             )
@@ -543,6 +548,7 @@ def train_for_station(station_folder):
             )
             y_test_inv = np.expm1(y_test_inv)
             y_pred_inv = np.expm1(y_pred_inv)
+
 
             mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
@@ -753,6 +759,7 @@ def main():
     # ----- Training and validation metrics -----
     y_train_pred_scaled = model.predict(X_train)
     df_cols = list(df_train_all.columns)
+
     y_train_inv = inverse_transform_predictions(y_train, scaler, df_cols, TARGET_COL)
     y_train_pred_inv = inverse_transform_predictions(
         y_train_pred_scaled, scaler, df_cols, TARGET_COL
@@ -821,12 +828,14 @@ def main():
         y_test_pred_scaled = model.predict(X_test)
 
         df_cols = list(df_test_stn.columns)
+
         y_test_inv = inverse_transform_predictions(y_test, scaler, df_cols, TARGET_COL)
         y_pred_inv = inverse_transform_predictions(
             y_test_pred_scaled, scaler, df_cols, TARGET_COL
         )
         y_test_inv = np.expm1(y_test_inv)
         y_pred_inv = np.expm1(y_pred_inv)
+
 
         mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
