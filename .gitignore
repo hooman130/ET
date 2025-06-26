@@ -1,8 +1,5 @@
 __pycache__/
 hawaii-et-rain-website/__pycache__/
 hawaii-et-rain-website/*.db
-plots/
-models/
 helpers/
-farm_data/
 .env
