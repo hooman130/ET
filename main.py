@@ -3,10 +3,14 @@ import math
 import requests
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
 
 # from math import sqrt
 # from datetime import datetime
 import concurrent.futures
+
+# Load the .env file
+load_dotenv()
 
 API_TOKEN = os.getenv("HCDP_API_TOKEN")
 if not API_TOKEN:
@@ -129,9 +133,14 @@ def process_farm(farm):
         df_tmin = fetch_daily_data_for_year(
             lat, lng, "temperature", start_date, end_date, aggregation="min"
         )
+        df_humidity = fetch_daily_data_for_year(
+            lat, lng, "relative_humidity", start_date, end_date
+        )
+
         df_rain = df_rain.rename(columns={"Value": "Rainfall (mm)"})
         df_tmax = df_tmax.rename(columns={"Value": "Tmax (°C)"})
         df_tmin = df_tmin.rename(columns={"Value": "Tmin (°C)"})
+        df_humidity = df_humidity.rename(columns={"Value": "Humidity (%)"})
 
         df_merge = pd.merge(df_rain, df_tmax, on="Date", how="outer")
         df_merge = pd.merge(df_merge, df_tmin, on="Date", how="outer")
@@ -142,6 +151,7 @@ def process_farm(farm):
         df_merge["Ra_mm"] = df_merge["doy"].apply(
             lambda doy: extraterrestrial_radiation_mm(doy, lat)
         )
+        df_merge["relative_humidity"] = df_humidity["Humidity (%)"] / 100.0
 
         def compute_et(row):
             if (
@@ -167,6 +177,7 @@ def process_farm(farm):
                 "Tmin (°C)",
                 "ET (mm/day)",
                 "Ra (mm/day)",
+                "relative_humidity",
             ]
         ].copy()
 

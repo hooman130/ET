@@ -114,6 +114,10 @@ def feature_engineering(df):
         df = df[df["Rainfall (mm)"].notna()]
         df.loc[:, "Rainfall (mm)"] = np.log1p(df["Rainfall (mm)"])
 
+    # --- Add the new feature column: relative_humidity ---
+    if "relative_humidity" in df.columns:
+        df["relative_humidity"] = df["relative_humidity"]
+
     # Drop columns we don't want in the model
     drop_cols = [
         "Date",
