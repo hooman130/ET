@@ -4,6 +4,8 @@ import requests
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
+from config import START_YEAR, END_YEAR
+import pyet as PyET
 
 # from math import sqrt
 # from datetime import datetime
@@ -41,15 +43,10 @@ API_URL = "https://api.hcdp.ikewai.org/raster/timeseries"
 # temperature (Tmax/Tmin) are always retrieved and therefore are not
 # included here.
 ADDITIONAL_DATATYPES = ["relative_humidity"]
-
+parallel = True
 
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-
-START_YEAR = 2000
-
-
-END_YEAR = 2025
 PARTIAL_END_DATE = "2025-03-12"
 
 
@@ -139,6 +136,10 @@ def process_farm(farm):
             lat, lng, "temperature", start_date, end_date, aggregation="min"
         )
 
+        df_tmean = fetch_daily_data_for_year(
+            lat, lng, "temperature", start_date, end_date, aggregation="mean"
+        )
+
         optional_data = {}
         for dtype in ADDITIONAL_DATATYPES:
             df_extra = fetch_daily_data_for_year(lat, lng, dtype, start_date, end_date)
@@ -151,12 +152,25 @@ def process_farm(farm):
         df_rain = df_rain.rename(columns={"Value": "Rainfall (mm)"})
         df_tmax = df_tmax.rename(columns={"Value": "Tmax (°C)"})
         df_tmin = df_tmin.rename(columns={"Value": "Tmin (°C)"})
+        df_tmean = df_tmean.rename(columns={"Value": "Tmean (°C)"})
 
         df_merge = pd.merge(df_rain, df_tmax, on="Date", how="outer")
         df_merge = pd.merge(df_merge, df_tmin, on="Date", how="outer")
+        df_merge = pd.merge(df_merge, df_tmean, on="Date", how="outer")
         df_merge.sort_values("Date", inplace=True)
 
-        df_merge["Tmean"] = (df_merge["Tmax (°C)"] + df_merge["Tmin (°C)"]) / 2.0
+        df_merge["Tavg (°C)"] = df_merge[["Tmax (°C)", "Tmin (°C)"]].mean(axis=1)
+
+        # Use Tmean, then fall back to Tavg, else null if both are null
+        df_merge["Tmean_final (°C)"] = df_merge.apply(
+            lambda row: (
+                row["Tmean (°C)"]
+                if pd.notnull(row["Tmean (°C)"])
+                else (row["Tavg (°C)"] if pd.notnull(row["Tavg (°C)"]) else np.nan)
+            ),
+            axis=1,
+        )
+
         df_merge["doy"] = df_merge["Date"].dt.dayofyear
         df_merge["Ra_mm"] = df_merge["doy"].apply(
             lambda doy: extraterrestrial_radiation_mm(doy, lat)
@@ -171,16 +185,49 @@ def process_farm(farm):
             if (
                 pd.notnull(row["Tmax (°C)"])
                 and pd.notnull(row["Tmin (°C)"])
-                and pd.notnull(row["Tmean"])
+                and pd.notnull(row["Tmean_final (°C)"])
             ):
                 diff = row["Tmax (°C)"] - row["Tmin (°C)"]
                 if diff < 0:
                     return None
-                return 0.0023 * (row["Tmean"] + 17.8) * np.sqrt(diff) * row["Ra_mm"]
+                return (
+                    0.0023
+                    * (row["Tmean_final (°C)"] + 17.8)
+                    * np.sqrt(diff)
+                    * row["Ra_mm"]
+                )
+            else:
+                return None
+
+        def compute_et2(row):
+            """
+            Computes reference evapotranspiration (ET0) using PyET (Hargreaves).
+            Requires: Tmin (°C), Tmax (°C), Tmean (°C), lat,
+            """
+            if (
+                pd.notnull(row["Tmin (°C)"])
+                and pd.notnull(row["Tmax (°C)"])
+                and pd.notnull(row["Tmean_final (°C)"])
+            ):
+                try:
+                    et0 = PyET.hargreaves(
+                        row["Tmean_final (°C)"],
+                        row["Tmax (°C)"],
+                        row["Tmin (°C)"],
+                        lat,
+                        k=0.0135,
+                        method=0,
+                        clip_zero=True,
+                    )
+
+                    return et0
+                except Exception:
+                    return None
             else:
                 return None
 
         df_merge["ET (mm/day)"] = df_merge.apply(compute_et, axis=1)
+        df_merge["ET2 (mm/day)"] = df_merge.apply(compute_et2, axis=1)
         df_merge = df_merge.rename(columns={"Ra_mm": "Ra (mm/day)"})
 
         base_cols = [
@@ -188,9 +235,14 @@ def process_farm(farm):
             "Rainfall (mm)",
             "Tmax (°C)",
             "Tmin (°C)",
+            "Tmean (°C)",  # from api
+            "Tavg (°C)",  # average of tmin and tmax
+            "Tmean_final (°C)",  # Tmean if available, else Tavg
             "ET (mm/day)",
+            # "ET2 (mm/day)",
             "Ra (mm/day)",
         ]
+
         final_df = df_merge[base_cols + list(optional_data.keys())].copy()
 
         final_df["Date"] = pd.to_datetime(final_df["Date"]).dt.strftime("%Y-%m-%d")
@@ -222,8 +274,12 @@ def process_farm(farm):
 
 
 def main():
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        executor.map(process_farm, farms)
+    if parallel:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            executor.map(process_farm, farms)
+    else:
+        for farm in farms:
+            process_farm(farm)
 
 
 if __name__ == "__main__":
