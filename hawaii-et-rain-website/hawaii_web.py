@@ -14,7 +14,9 @@ import tensorflow.keras.backend as K
 
 
 
-API_TOKEN = "1b8a6439c85b8e42e211b68ea68ac198" 
+API_TOKEN = os.getenv("HCDP_API_TOKEN")
+if not API_TOKEN:
+    raise RuntimeError("HCDP_API_TOKEN environment variable not set")
 API_URL = "https://api.hcdp.ikewai.org/raster/timeseries"
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 

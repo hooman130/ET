@@ -15,6 +15,35 @@ from datetime import datetime
 
 # Concurrency
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from generate_scatter_report import generate_scatter_report
+from config import (
+    STATION_FOLDERS,
+    TRAIN_PER_FARM,
+    MODELS_DIR,
+    BASE_DIR,
+    TRAIN_RATIO,
+    VAL_RATIO,
+    TEST_RATIO,
+    START_YEAR,
+    END_YEAR,
+    WINDOW_SIZE,
+    HORIZON,
+    MAX_WORKERS,
+    RANDOM_SEED,
+)
+from training_utils import (
+    r2_keras,
+    load_station_data,
+    split_by_percentages,
+    create_sequences,
+    inverse_transform_predictions,
+    compute_metrics,
+    plot_time_series_predictions,
+    plot_scatter_day,
+    plot_training_history,
+)
+
+os.makedirs(MODELS_DIR, exist_ok=True)
 
 # Scikit-learn
 from sklearn.model_selection import train_test_split
@@ -43,135 +72,19 @@ plt.rcParams.update({"font.size": 12, "axes.titlesize": 14, "axes.labelsize": 12
 # -------------------------------
 # 1. Configuration
 # -------------------------------
+# Configuration constants are imported from `config`.
 
-STATION_FOLDERS = [
-    "Kahuku_Farm",
-    "Nozawa_Farms",
-    "Kuilima_Farms",
-    "Cabaero_Farms",  # Corresponds to Cabaero Farms (lat: 20.8425, lng: -156.3471)
-    "Kupaa_Farms",  # Corresponds to Kupa'a Farms (lat: 20.7658, lng: -156.3513)
-    "MAO_Organic_Farms_(new_site)",  # From MA'O Organic Farms (original site)
-    "MAO_Organic_Farms_(original_site)",  # From MA'O Organic Farms (new site)
-    "2K_Farm_LLC",  # From 2K Farm LLC
-    "Wong_Hon_Hin_Inc",  # From Wong Hon Hin Inc
-    "Hawaii_Taro_Farm_LLC",  # From Hawaii Taro Farm, LLC
-    "Hawaii_Seed_Pro_LLC_Farm",  # From Hawaii Seed Pro LLC Farm
-    "Cabaero_Farm",  # Corresponds to Cabaero Farm (lat: 20.791703, lng: -156.358194)
-    "Kupaa_Farms2",  # Second instance of Kupaa Farms (lat: 20.765515, lng: -156.35185)
-    "Hirako_Farm",  # First instance of Hirako Farm
-    "Hirako_Farm1",  # Second instance of Hirako Farm
-    "Anoano_Farms",  # From Anoano Farms
-]
-
-# Train models individually for each farm when True. When False, all data is
-# combined as before.
-TRAIN_PER_FARM = True
-
-# Directory to store trained models and scalers when TRAIN_PER_FARM is enabled
-MODELS_DIR = "models"
-os.makedirs(MODELS_DIR, exist_ok=True)
-
-# Base directory for station folders
-BASE_DIR = "farm_data"
-
-# Ratios for chronological split of each farm's data
-TRAIN_RATIO = 0.70
-VAL_RATIO = 0.15
-TEST_RATIO = 0.15
-
-# -------------------------------
-# Year Filtering
-# -------------------------------
-# Define the year range to use.  Set to ``None`` to omit the bound.
-# The filter is applied prior to splitting the data.
-START_YEAR = 2000  # e.g. 2018
-END_YEAR = 2025  # e.g. 2022
-
-# Input sequence length (days to look back)
-WINDOW_SIZE = 24
-
-# Forecast horizon (days to predict)
-HORIZON = 3
-
-MAX_WORKERS = 8  # Number of parallel processes for training
 # Target column name for rainfall forecasting
 TARGET_COL = "Rainfall (mm)"
-
-# Random seed for reproducibility
-RANDOM_SEED = 42
-
-# Where to save the trained model
 MODEL_PATH = "model_rain_lstm.h5"
-
-# Where to save rainfall plots and results
 PLOTS_DIR = (
-    "plots_test_rainfall"
-    if START_YEAR is None
-    else f"plots_test_rainfall_{START_YEAR}-{END_YEAR}"
+    "plots_test_rainfall" if START_YEAR is None else f"plots_test_rainfall_{START_YEAR}-{END_YEAR}"
 )
 PLOTS_DIR = os.path.join("plots", PLOTS_DIR)
 os.makedirs(PLOTS_DIR, exist_ok=True)
-
-
 # -------------------------------
 # 2. Custom R² Metric
 # -------------------------------
-def r2_keras(y_true, y_pred):
-    """
-    Custom R² metric for Keras.
-    For multi-output (shape=[batch, horizon]), we flatten both
-    y_true and y_pred to compute an overall R².
-    """
-    y_true_f = K.flatten(y_true)
-    y_pred_f = K.flatten(y_pred)
-    ss_res = K.sum(K.square(y_true_f - y_pred_f))
-    ss_tot = K.sum(K.square(y_true_f - K.mean(y_true_f)))
-    return 1 - ss_res / (ss_tot + K.epsilon())
-
-
-# -------------------------------
-# 3. Helper Functions
-# -------------------------------
-def load_station_data(station_folder):
-    """
-    Loads 'all_years_data.csv' for one station, sorts by Date.
-    Returns the DataFrame or empty if not found.
-    """
-    csv_path = os.path.join(BASE_DIR, station_folder, "all_years_data.csv")
-    if not os.path.exists(csv_path):
-        print(f"Warning: {csv_path} not found. Station: {station_folder}")
-        return pd.DataFrame()  # empty
-
-    df = pd.read_csv(csv_path)
-    if "Date" in df.columns:
-        df["Date"] = pd.to_datetime(df["Date"])
-        df.sort_values("Date", inplace=True)
-        df.reset_index(drop=True, inplace=True)
-        if START_YEAR is not None:
-            df = df[df["Date"].dt.year >= START_YEAR]
-        if END_YEAR is not None:
-            df = df[df["Date"].dt.year <= END_YEAR]
-        df.reset_index(drop=True, inplace=True)
-    return df
-
-
-def split_by_percentages(
-    df, train_ratio=TRAIN_RATIO, val_ratio=VAL_RATIO, test_ratio=TEST_RATIO
-):
-    """Split a DataFrame chronologically into train/val/test portions."""
-    if df.empty or "Date" not in df.columns:
-        return df, pd.DataFrame(), pd.DataFrame()
-
-    df_sorted = df.sort_values("Date").reset_index(drop=True)
-    n = len(df_sorted)
-    train_end = int(n * train_ratio)
-    val_end = train_end + int(n * val_ratio)
-
-    df_train = df_sorted.iloc[:train_end].copy()
-    df_val = df_sorted.iloc[train_end:val_end].copy()
-    df_test = df_sorted.iloc[val_end:].copy()
-
-    return df_train, df_val, df_test
 
 
 def feature_engineering(df):
@@ -218,151 +131,6 @@ def feature_engineering(df):
     return df
 
 
-def create_sequences(df, window_size, horizon, target_col):
-    """
-    Create time-series sequences from a DataFrame:
-    X.shape => (num_samples, window_size, num_features)
-    y.shape => (num_samples, horizon)
-    """
-    data = df.values
-    X, y = [], []
-    for i in range(len(df) - window_size - horizon + 1):
-        X_i = data[i : i + window_size, :]
-        y_i = data[
-            i + window_size : i + window_size + horizon, df.columns.get_loc(target_col)
-        ]
-        X.append(X_i)
-        y.append(y_i)
-    return np.array(X), np.array(y)
-
-
-def inverse_transform_predictions(y_scaled, scaler, df_columns, target_col):
-    """
-    Given scaled predictions (y_scaled) of shape (num_samples, horizon),
-    create a dummy array so we can apply inverse_transform,
-    then return just the target column portion in the original scale.
-    """
-    n_samples, horizon = y_scaled.shape
-    n_features = len(df_columns)
-    target_idx = df_columns.index(target_col)
-
-    dummy = np.zeros((n_samples * horizon, n_features))
-    # Place the scaled predictions in the target column
-    for i in range(horizon):
-        dummy[i * n_samples : (i + 1) * n_samples, target_idx] = y_scaled[:, i]
-
-    dummy_inv = scaler.inverse_transform(dummy)
-    target_inv = dummy_inv[:, target_idx]
-    # Reshape to (n_samples, horizon)
-    target_inv = target_inv.reshape(horizon, n_samples).T
-    return target_inv
-
-
-def compute_metrics(y_true, y_pred):
-    """Return MAE, MSE, RMSE, R² average and per-horizon array."""
-    mse = mean_squared_error(y_true, y_pred, multioutput="uniform_average")
-    mae = mean_absolute_error(y_true, y_pred, multioutput="uniform_average")
-    rmse = math.sqrt(mse)
-    r2_avg = r2_score(y_true, y_pred, multioutput="uniform_average")
-    r2_each = r2_score(y_true, y_pred, multioutput="raw_values")
-    return mae, mse, rmse, r2_avg, r2_each
-
-
-def plot_time_series_predictions(y_true, y_pred, horizon, station_folder):
-    """
-    Plots actual vs predicted Rainfall for each day in the forecast horizon (day+1, day+2, day+3),
-    as a time series (blue line for actual vs. red line for predicted).
-    """
-    station_plot_dir = os.path.join(PLOTS_DIR, station_folder)
-    os.makedirs(station_plot_dir, exist_ok=True)
-    save_path = os.path.join(station_plot_dir, "test_predictions.png")
-
-    plt.figure(figsize=(10, 8))
-    for day_idx in range(horizon):
-        ax = plt.subplot(horizon, 1, day_idx + 1)
-        ax.plot(y_true[:, day_idx], label="Actual", color="blue")
-        ax.plot(y_pred[:, day_idx], label="Predicted", color="red")
-        ax.set_title(f"Day +{day_idx+1} Rainfall Forecast")
-        ax.legend()
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
-
-
-def plot_scatter_day(y_true, y_pred, day_idx, station_folder):
-    """
-    Creates a scatter plot: x=actual, y=predicted, for a specific day in the forecast horizon.
-    Saves as scatter_day{day_idx+1}.png in the station's folder.
-    """
-    station_plot_dir = os.path.join(PLOTS_DIR, station_folder)
-    os.makedirs(station_plot_dir, exist_ok=True)
-    save_path = os.path.join(station_plot_dir, f"scatter_day{day_idx+1}.png")
-
-    plt.figure(figsize=(6, 6))
-    plt.scatter(
-        y_true[:, day_idx],
-        y_pred[:, day_idx],
-        alpha=0.6,
-        color="tab:blue",
-        label="Predictions",
-    )
-    plt.title(f"Scatter Plot: Day +{day_idx+1} Rainfall")
-    plt.xlabel("Actual Rainfall")
-    plt.ylabel("Predicted Rainfall")
-
-    # Add y=x reference line
-    min_val = min(y_true[:, day_idx].min(), y_pred[:, day_idx].min())
-    max_val = max(y_true[:, day_idx].max(), y_pred[:, day_idx].max())
-    plt.plot(
-        [min_val, max_val],
-        [min_val, max_val],
-        color="red",
-        linestyle="--",
-        label="Ideal",
-    )
-
-    # Compute metrics for this forecast day
-    mae_d, mse_d, rmse_d, r2_d, _ = compute_metrics(
-        y_true[:, day_idx : day_idx + 1], y_pred[:, day_idx : day_idx + 1]
-    )
-    metrics_text = (
-        f"MAE: {mae_d:.2f}\nMSE: {mse_d:.2f}\nRMSE: {rmse_d:.2f}\nR²: {r2_d:.2f}"
-    )
-    plt.gca().text(
-        0.05,
-        0.95,
-        metrics_text,
-        transform=plt.gca().transAxes,
-        fontsize=10,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.5),
-    )
-
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
-
-
-def plot_training_history(history, save_path):
-    """
-    Plots training & validation loss over epochs, saving the plot to save_path.
-    If R² is in the history, that is plotted as well.
-    """
-    plt.figure(figsize=(8, 5))
-    plt.plot(history.history["loss"], label="Train Loss")
-    plt.plot(history.history["val_loss"], label="Val Loss")
-    if "r2_keras" in history.history:
-        plt.plot(history.history["r2_keras"], label="Train R2")
-    if "val_r2_keras" in history.history:
-        plt.plot(history.history["val_r2_keras"], label="Val R2")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss / R²")
-    plt.title("Training History (Loss and R²)")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
 
 
 # -------------------------------
@@ -558,10 +326,22 @@ def train_for_station(station_folder):
             print(f"R²:   {r2_avg:.4f}")
 
             plot_time_series_predictions(
-                y_test_inv, y_pred_inv, HORIZON, station_folder
+                y_test_inv,
+                y_pred_inv,
+                HORIZON,
+                station_folder,
+                PLOTS_DIR,
+                "Rainfall",
             )
             for day_idx in range(HORIZON):
-                plot_scatter_day(y_test_inv, y_pred_inv, day_idx, station_folder)
+                plot_scatter_day(
+                    y_test_inv,
+                    y_pred_inv,
+                    day_idx,
+                    station_folder,
+                    PLOTS_DIR,
+                    "Rainfall",
+                )
 
             metrics_summary["test_mae"] = mae
             metrics_summary["test_mse"] = mse
@@ -843,10 +623,24 @@ def main():
         print(f"RMSE: {rmse:.4f}")
         print(f"R²:   {r2_avg:.4f}")
 
-        plot_time_series_predictions(y_test_inv, y_pred_inv, HORIZON, station)
+        plot_time_series_predictions(
+            y_test_inv,
+            y_pred_inv,
+            HORIZON,
+            station,
+            PLOTS_DIR,
+            "Rainfall",
+        )
 
         for day_idx in range(HORIZON):
-            plot_scatter_day(y_test_inv, y_pred_inv, day_idx, station)
+            plot_scatter_day(
+                y_test_inv,
+                y_pred_inv,
+                day_idx,
+                station,
+                PLOTS_DIR,
+                "Rainfall",
+            )
 
         test_metrics_list.append(
             {
