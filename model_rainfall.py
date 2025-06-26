@@ -84,7 +84,7 @@ TEST_RATIO = 0.15
 # -------------------------------
 # Define the year range to use.  Set to ``None`` to omit the bound.
 # The filter is applied prior to splitting the data.
-START_YEAR = 2014  # e.g. 2018
+START_YEAR = 2000  # e.g. 2018
 END_YEAR = 2025  # e.g. 2022
 
 # Input sequence length (days to look back)
@@ -97,19 +97,19 @@ MAX_WORKERS = 8  # Number of parallel processes for training
 # Target column name for rainfall forecasting
 TARGET_COL = "Rainfall (mm)"
 
-
 # Random seed for reproducibility
 RANDOM_SEED = 42
 
 # Where to save the trained model
 MODEL_PATH = "model_rain_lstm.h5"
 
-# Where to save plots and results
+# Where to save rainfall plots and results
 PLOTS_DIR = (
     "plots_test_rainfall"
     if START_YEAR is None
     else f"plots_test_rainfall_{START_YEAR}-{END_YEAR}"
 )
+PLOTS_DIR = os.path.join("plots", PLOTS_DIR)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
@@ -181,7 +181,7 @@ def feature_engineering(df):
     """
     if df.empty:
         return df
-    
+
     # Extract day & month
     if "Date" in df.columns:
         df["day"] = df["Date"].dt.day
@@ -207,7 +207,7 @@ def feature_engineering(df):
         "Station",
         "month",
         "RH (%)",
-        "Wind Speed (m/s)",
+        "Wind Speed (m/s)",``
     ]
     for col in drop_cols:
         if col in df.columns:
@@ -470,14 +470,14 @@ def train_for_station(station_folder):
     # --- Metrics on training set ---
     y_train_pred_scaled = model.predict(X_train)
     df_cols = list(df_train.columns)
-    
+
     y_train_inv = inverse_transform_predictions(y_train, scaler, df_cols, TARGET_COL)
     y_train_pred_inv = inverse_transform_predictions(
         y_train_pred_scaled, scaler, df_cols, TARGET_COL
     )
     y_train_inv = np.expm1(y_train_inv)
     y_train_pred_inv = np.expm1(y_train_pred_inv)
-    
+
     train_mae, train_mse, train_rmse, train_r2_avg, train_r2_each = compute_metrics(
         y_train_inv, y_train_pred_inv
     )
@@ -548,7 +548,6 @@ def train_for_station(station_folder):
             )
             y_test_inv = np.expm1(y_test_inv)
             y_pred_inv = np.expm1(y_pred_inv)
-
 
             mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
@@ -835,7 +834,6 @@ def main():
         )
         y_test_inv = np.expm1(y_test_inv)
         y_pred_inv = np.expm1(y_pred_inv)
-
 
         mae, mse, rmse, r2_avg, r2_each = compute_metrics(y_test_inv, y_pred_inv)
 
