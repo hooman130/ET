@@ -20,6 +20,7 @@ from config import (
     STATION_FOLDERS,
     TRAIN_PER_FARM,
     MODELS_DIR,
+    TRAINING_ANALYSIS_DIR,
     BASE_DIR,
     TRAIN_RATIO,
     VAL_RATIO,
@@ -44,6 +45,7 @@ from training_utils import (
 )
 
 os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(TRAINING_ANALYSIS_DIR, exist_ok=True)
 
 # Scikit-learn
 from sklearn.model_selection import train_test_split
@@ -228,7 +230,11 @@ def train_for_station(station_folder):
     os.makedirs(station_plot_dir, exist_ok=True)
 
     history_csv_path = os.path.join(station_plot_dir, "training_history_values.csv")
-    pd.DataFrame(history.history).to_csv(history_csv_path, index=False)
+    history_df = pd.DataFrame(history.history)
+    history_df.to_csv(history_csv_path, index=False)
+
+    analysis_csv_path = os.path.join(TRAINING_ANALYSIS_DIR, f"{station_folder}_history.csv")
+    history_df.to_csv(analysis_csv_path, index=False)
 
     plot_history_path = os.path.join(station_plot_dir, "training_history.png")
     plot_training_history(history, plot_history_path)
@@ -528,6 +534,9 @@ def main():
     history_df.to_csv(history_csv_path, index=False)
     print(f"Training history values saved to {history_csv_path}")
 
+    analysis_csv_path = os.path.join(TRAINING_ANALYSIS_DIR, "combined_history.csv")
+    history_df.to_csv(analysis_csv_path, index=False)
+
     # Plot training history (loss and R²)
     plot_history_path = os.path.join(PLOTS_DIR, "training_history.png")
     plot_training_history(history, plot_history_path)
@@ -662,6 +671,10 @@ def main():
     test_df.to_csv(test_path, index=False)
     print(f"\nTraining/validation metrics saved to {train_val_path}")
     print(f"Test metrics saved to {test_path}")
+
+    summary_path = os.path.join(TRAINING_ANALYSIS_DIR, "summary.csv")
+    summary_df = train_val_df.merge(test_df, on="farm", how="left")
+    summary_df.to_csv(summary_path, index=False)
 
     print("\nAll done. End of script.")
 
