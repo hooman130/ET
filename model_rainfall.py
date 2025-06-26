@@ -207,7 +207,7 @@ def feature_engineering(df):
         "Station",
         "month",
         "RH (%)",
-        "Wind Speed (m/s)",``
+        "Wind Speed (m/s)",
     ]
     for col in drop_cols:
         if col in df.columns:
