@@ -6,9 +6,9 @@ keras_nightly
 matplotlib
 numpy
 pydeck
-Requests
+requests
 SALib
-scikit_learn
+scikit-learn
 scipy
 seaborn
 streamlit

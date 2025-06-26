@@ -91,8 +91,8 @@ def load_models_for_farm(farm_name):
                 scalers_cache[farm_name].get('rain'))
 
     base = sanitize_farm_name(farm_name)
-    model_et_path = os.path.join(MODELS_DIR, f"{base}_model_lstm.h5")
-    model_rain_path = os.path.join(MODELS_DIR, f"{base}_model_rain_lstm.h5")
+    model_et_path = os.path.join(MODELS_DIR, f"{base}_model_lstm.keras")
+    model_rain_path = os.path.join(MODELS_DIR, f"{base}_model_rain_lstm.keras")
     scaler_et_path = os.path.join(MODELS_DIR, f"{base}_scaler_ET.pkl")
     scaler_rain_path = os.path.join(MODELS_DIR, f"{base}_scaler_Rain.pkl")
 

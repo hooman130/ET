@@ -331,7 +331,7 @@ elif selected_page == "Real-time Forecast":
                 })
 
             if not map_data_points:
-                st.warning("No positive forecast values to display on the map for the selected farm.")
+                st.warning("No positive forecast values are available to display on the map for the selected farm.")
             else:
                 map_df = pd.DataFrame(map_data_points)
 
@@ -379,12 +379,12 @@ elif selected_page == "Real-time Forecast":
                 <small>(Bars represent positive forecast values. Height is proportional to the value. Adjust `elevation_scale` and `radius` in code for better visualization if needed.)</small>
                 """, unsafe_allow_html=True)
         else:
-            st.error(f"❌ Could not retrieve or calculate predictions for {selected_farm}. The data source might be temporarily unavailable, or input data might be insufficient. Please check back later or try another station.")
+            st.error(f"❌ Could not retrieve or calculate predictions for {selected_farm}. The data source might be temporarily unavailable or input data might be insufficient. Please check back later or try another station.")
 
 
 elif selected_page == "Historical Data":
     st.header("📜 Historical Predictions (Condensed View)")
-    st.write("Latest forecast for each farm. Each row shows the latest prediction (Rain for Day 1, ET for 3 days).")
+    st.write("Latest forecast for each farm. Each row shows the most recent prediction (rain for Day 1 and ET for three days).")
 
     df_offline = fetch_latest_data_from_db()
     if df_offline.empty:
@@ -443,7 +443,7 @@ elif selected_page == "Historical Data":
             for i, row in df_display.iterrows():
                 tooltip = (
                     f"<b>{row['Station']}</b><br>"
-                    f"Rain (Day1): {row['Rain (Day 1)']}<br>"
+                    f"Rain (Day 1): {row['Rain (Day 1)']}<br>"
                     f"ET Today: {row['ET-Today']}<br>"
                     f"ET Tomorrow: {row['ET-Tomorrow']}<br>"
                     f"ET Day After Tomorrow: {row['ET-Day After Tomorrow']}"
@@ -459,7 +459,7 @@ elif selected_page == "Historical Data":
 
 elif selected_page == "API Reference":
     st.header("⚙️ API Reference")
-    st.write("Get the latest forecast for any farm as JSON or CSV. Just select a farm and output type. You will see the API URL and the live result below.")
+    st.write("Retrieve the latest forecast for any farm as JSON or CSV. Select a farm and the output format to see the API URL and live results.")
 
     farm_names_sorted = sorted(farm_names)
     selected_farm = st.selectbox("Select Farm:", farm_names_sorted, key="api_ref_farm")
