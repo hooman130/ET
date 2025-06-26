@@ -31,7 +31,6 @@ from config import (
     RANDOM_SEED,
 )
 from training_utils import (
-    r2_keras,
     load_station_data,
     split_by_percentages,
     create_sequences,
@@ -88,8 +87,6 @@ PLOTS_DIR = os.path.join("plots", PLOTS_DIR)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
-
-
 def feature_engineering(df):
     """
     Adds 'day', 'month' features, drops columns not needed (Date, etc.),
@@ -112,8 +109,6 @@ def feature_engineering(df):
     df.dropna(inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
-
-
 
 
 # -------------------------------
@@ -187,7 +182,7 @@ def train_for_station(station_folder):
     model.compile(
         loss="mse",
         optimizer=Adam(learning_rate=0.001),
-        metrics=["mae", r2_keras],
+        metrics=["mae"],
     )
 
     early_stop = EarlyStopping(

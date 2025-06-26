@@ -3,8 +3,9 @@ import math
 import requests
 import pandas as pd
 import numpy as np
-from math import sqrt
-from datetime import datetime
+
+# from math import sqrt
+# from datetime import datetime
 import concurrent.futures
 
 API_TOKEN = os.getenv("HCDP_API_TOKEN")
@@ -39,18 +40,11 @@ headers = {"Authorization": f"Bearer {API_TOKEN}"}
 START_YEAR = 2000
 
 
-
 END_YEAR = 2025
 PARTIAL_END_DATE = "2025-03-12"
 
 
-
-
-
 def extraterrestrial_radiation_mm(doy, latitude_degs):
-
-
-
 
     lat = math.radians(latitude_degs)
 
@@ -59,26 +53,23 @@ def extraterrestrial_radiation_mm(doy, latitude_degs):
     delta = 0.409 * math.sin((2 * math.pi / 365) * doy - 1.39)
     omega_s = math.acos(-math.tan(lat) * math.tan(delta))
 
-
-    Ra_MJ = (24 * 60 / math.pi) * Gsc * dr * (
+    Ra_MJ = (
+        (24 * 60 / math.pi)
+        * Gsc
+        * dr
+        * (
             omega_s * math.sin(lat) * math.sin(delta)
             + math.cos(lat) * math.cos(delta) * math.sin(omega_s)
         )
+    )
 
     Ra_mm = 0.408 * Ra_MJ
     return Ra_mm
 
 
-
-
-
-
-
-
-
-
-
-def fetch_daily_data_for_year(lat, lng, datatype, start_date, end_date, aggregation=None):
+def fetch_daily_data_for_year(
+    lat, lng, datatype, start_date, end_date, aggregation=None
+):
     params = {
         "start": start_date,
         "end": end_date,
@@ -98,9 +89,9 @@ def fetch_daily_data_for_year(lat, lng, datatype, start_date, end_date, aggregat
     response = requests.get(API_URL, headers=headers, params=params)
     if response.status_code != 200:
 
-
-
-        print(f"Error fetching data ({datatype}, aggregation={aggregation}, range={start_date}-{end_date}):")
+        print(
+            f"Error fetching data ({datatype}, aggregation={aggregation}, range={start_date}-{end_date}):"
+        )
         print(response.status_code, response.text)
         return pd.DataFrame(columns=["Date", "Value"])
     else:
@@ -112,138 +103,105 @@ def fetch_daily_data_for_year(lat, lng, datatype, start_date, end_date, aggregat
     return df
 
 
-
-
-
-
-
 def process_farm(farm):
-        farm_name = farm["name"]
-        lat = farm["lat"]
-        lng = farm["lng"]
+    farm_name = farm["name"]
+    lat = farm["lat"]
+    lng = farm["lng"]
 
+    farm_folder_name = farm_name.replace(" ", "_").replace("'", "")
+    print(f"Processing data for: {farm_name}")
 
-        farm_folder_name = farm_name.replace(" ", "_").replace("'", "")
-        print(f"Processing data for: {farm_name}")
+    all_years_data = []
 
-
-        all_years_data = []
-
-        for year in range(START_YEAR, END_YEAR + 1):
-            start_date = f"{year}-01-01"
-
-
-
-
-
-
-        end_date = PARTIAL_END_DATE if (year == END_YEAR and PARTIAL_END_DATE) else f"{year}-12-31"
-            print(f"  Year: {year}, Range: {start_date} to {end_date}")
-
-
-
-
-
-
-
-
-
-
-
-
+    for year in range(START_YEAR, END_YEAR + 1):
+        start_date = f"{year}-01-01"
+        end_date = (
+            PARTIAL_END_DATE
+            if (year == END_YEAR and PARTIAL_END_DATE)
+            else f"{year}-12-31"
+        )
+        print(f"  Year: {year}, Range: {start_date} to {end_date}")
 
         df_rain = fetch_daily_data_for_year(lat, lng, "rainfall", start_date, end_date)
-        df_tmax = fetch_daily_data_for_year(lat, lng, "temperature", start_date, end_date, aggregation="max")
-        df_tmin = fetch_daily_data_for_year(lat, lng, "temperature", start_date, end_date, aggregation="min")
-            df_rain = df_rain.rename(columns={"Value": "Rainfall (mm)"})
-            df_tmax = df_tmax.rename(columns={"Value": "Tmax (°C)"})
-            df_tmin = df_tmin.rename(columns={"Value": "Tmin (°C)"})
+        df_tmax = fetch_daily_data_for_year(
+            lat, lng, "temperature", start_date, end_date, aggregation="max"
+        )
+        df_tmin = fetch_daily_data_for_year(
+            lat, lng, "temperature", start_date, end_date, aggregation="min"
+        )
+        df_rain = df_rain.rename(columns={"Value": "Rainfall (mm)"})
+        df_tmax = df_tmax.rename(columns={"Value": "Tmax (°C)"})
+        df_tmin = df_tmin.rename(columns={"Value": "Tmin (°C)"})
 
+        df_merge = pd.merge(df_rain, df_tmax, on="Date", how="outer")
+        df_merge = pd.merge(df_merge, df_tmin, on="Date", how="outer")
+        df_merge.sort_values("Date", inplace=True)
 
-            df_merge = pd.merge(df_rain, df_tmax, on="Date", how="outer")
-            df_merge = pd.merge(df_merge, df_tmin, on="Date", how="outer")
-            df_merge.sort_values("Date", inplace=True)
+        df_merge["Tmean"] = (df_merge["Tmax (°C)"] + df_merge["Tmin (°C)"]) / 2.0
+        df_merge["doy"] = df_merge["Date"].dt.dayofyear
+        df_merge["Ra_mm"] = df_merge["doy"].apply(
+            lambda doy: extraterrestrial_radiation_mm(doy, lat)
+        )
 
-
-            df_merge["Tmean"] = (df_merge["Tmax (°C)"] + df_merge["Tmin (°C)"]) / 2.0
-
-
-            df_merge["doy"] = df_merge["Date"].dt.dayofyear
-
-
-
-
-
-        df_merge["Ra_mm"] = df_merge["doy"].apply(lambda doy: extraterrestrial_radiation_mm(doy, lat))
-            def compute_et(row):
-                if (
-                    pd.notnull(row["Tmax (°C)"])
-                    and pd.notnull(row["Tmin (°C)"])
-                    and pd.notnull(row["Tmean"])
-                ):
-                    diff = row["Tmax (°C)"] - row["Tmin (°C)"]
-
-
-                if diff < 0: return None
-                    return 0.0023 * (row["Tmean"] + 17.8) * np.sqrt(diff) * row["Ra_mm"]
-                else:
+        def compute_et(row):
+            if (
+                pd.notnull(row["Tmax (°C)"])
+                and pd.notnull(row["Tmin (°C)"])
+                and pd.notnull(row["Tmean"])
+            ):
+                diff = row["Tmax (°C)"] - row["Tmin (°C)"]
+                if diff < 0:
                     return None
+                return 0.0023 * (row["Tmean"] + 17.8) * np.sqrt(diff) * row["Ra_mm"]
+            else:
+                return None
 
-            df_merge["ET (mm/day)"] = df_merge.apply(compute_et, axis=1)
+        df_merge["ET (mm/day)"] = df_merge.apply(compute_et, axis=1)
+        df_merge = df_merge.rename(columns={"Ra_mm": "Ra (mm/day)"})
 
+        final_df = df_merge[
+            [
+                "Date",
+                "Rainfall (mm)",
+                "Tmax (°C)",
+                "Tmin (°C)",
+                "ET (mm/day)",
+                "Ra (mm/day)",
+            ]
+        ].copy()
 
-            df_merge = df_merge.rename(columns={"Ra_mm": "Ra (mm/day)"})
+        final_df["Date"] = pd.to_datetime(final_df["Date"]).dt.strftime("%Y-%m-%d")
+        final_df["Latitude"] = lat
+        final_df["Longitude"] = lng
+        final_df["Station"] = farm_name
 
-            final_df = df_merge[
+        if final_df.empty:
+            print(f"    -> No data found for {year}, skipping file creation.")
+            return
 
+        station_dir = os.path.join("farm_data", farm_folder_name, str(year))
+        os.makedirs(station_dir, exist_ok=True)
+        csv_path = os.path.join(station_dir, "daily_data.csv")
+        final_df.to_csv(csv_path, index=False)
+        print(f"    -> Data saved to: {csv_path}")
 
+        all_years_data.append(final_df)
 
+    if all_years_data:
+        station_dir = os.path.join("farm_data", farm_folder_name)
+        combined_df = pd.concat(all_years_data, ignore_index=True)
+        combined_df.sort_values("Date", inplace=True)
 
-
-
-
-
-            ["Date", "Rainfall (mm)", "Tmax (°C)", "Tmin (°C)", "ET (mm/day)", "Ra (mm/day)"]
-            ].copy()
-
-            final_df["Date"] = pd.to_datetime(final_df["Date"]).dt.strftime("%Y-%m-%d")
-
-
-            final_df["Latitude"] = lat
-            final_df["Longitude"] = lng
-            final_df["Station"] = farm_name
-
-            if final_df.empty:
-                print(f"    -> No data found for {year}, skipping file creation.")
-                continue
-
-
-            station_dir = os.path.join("farm_data", farm_folder_name, str(year))
-            os.makedirs(station_dir, exist_ok=True)
-            csv_path = os.path.join(station_dir, "daily_data.csv")
-            final_df.to_csv(csv_path, index=False)
-            print(f"    -> Data saved to: {csv_path}")
-
-
-            all_years_data.append(final_df)
-
-
-        if all_years_data:
-            station_dir = os.path.join("farm_data", farm_folder_name)
-            combined_df = pd.concat(all_years_data, ignore_index=True)
-            combined_df.sort_values("Date", inplace=True)
-
-
-            combined_csv_path = os.path.join(station_dir, "all_years_data.csv")
-            combined_df.to_csv(combined_csv_path, index=False)
-            print(f"--> All years combined data saved to: {combined_csv_path}")
+        combined_csv_path = os.path.join(station_dir, "all_years_data.csv")
+        combined_df.to_csv(combined_csv_path, index=False)
+        print(f"--> All years combined data saved to: {combined_csv_path}")
     print("")
-
-
 
 
 def main():
     with concurrent.futures.ProcessPoolExecutor() as executor:
         executor.map(process_farm, farms)
+
+
 if __name__ == "__main__":
     main()

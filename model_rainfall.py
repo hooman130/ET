@@ -110,7 +110,7 @@ def feature_engineering(df):
     # Log-transform rainfall to stabilize variance
     if "Rainfall (mm)" in df.columns:
         df = df[df["Rainfall (mm)"].notna()]
-        df["Rainfall (mm)"] = np.log1p(df["Rainfall (mm)"])
+        df.loc[:, "Rainfall (mm)"] = np.log1p(df["Rainfall (mm)"])
 
     # Drop columns we don't want in the model
     drop_cols = [
@@ -124,13 +124,11 @@ def feature_engineering(df):
     ]
     for col in drop_cols:
         if col in df.columns:
-            df.drop(col, axis=1, inplace=True)
+            df = df.drop(col, axis=1)
 
     df.dropna(inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
-
-
 
 
 # -------------------------------
@@ -205,7 +203,7 @@ def train_for_station(station_folder):
     model.compile(
         loss="mse",
         optimizer=Adam(learning_rate=0.001),
-        metrics=["mae", r2_keras],
+        metrics=["mae"],
     )
 
     early_stop = EarlyStopping(
@@ -219,7 +217,7 @@ def train_for_station(station_folder):
         epochs=50,
         batch_size=32,
         callbacks=[early_stop],
-        verbose=1,
+        verbose=0,
     )
 
     model_path = os.path.join(MODELS_DIR, f"{station_folder}_model_rain_lstm.keras")
@@ -503,7 +501,7 @@ def main():
     model.compile(
         loss="mse",
         optimizer=Adam(learning_rate=0.001),
-        metrics=["mae", r2_keras],  # add custom R² metric
+        metrics=["mae"],  # add custom R² metric
     )
 
     early_stop = EarlyStopping(
@@ -517,7 +515,7 @@ def main():
         epochs=50,
         batch_size=32,
         callbacks=[early_stop],
-        verbose=1,
+        verbose=0,
     )
 
     # Save the trained model
