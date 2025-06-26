@@ -37,6 +37,11 @@ farms = [
 
 API_URL = "https://api.hcdp.ikewai.org/raster/timeseries"
 
+# Optional datatypes to fetch for the rainfall model. Rainfall and
+# temperature (Tmax/Tmin) are always retrieved and therefore are not
+# included here.
+ADDITIONAL_DATATYPES = ["relative_humidity"]
+
 
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
@@ -133,14 +138,19 @@ def process_farm(farm):
         df_tmin = fetch_daily_data_for_year(
             lat, lng, "temperature", start_date, end_date, aggregation="min"
         )
-        df_humidity = fetch_daily_data_for_year(
-            lat, lng, "relative_humidity", start_date, end_date
-        )
+
+        optional_data = {}
+        for dtype in ADDITIONAL_DATATYPES:
+            df_extra = fetch_daily_data_for_year(lat, lng, dtype, start_date, end_date)
+            if not df_extra.empty and df_extra["Value"].notna().any():
+                df_extra = df_extra.rename(columns={"Value": dtype})
+                optional_data[dtype] = df_extra
+            else:
+                print(f"    -> {dtype} data missing or empty for {year}")
 
         df_rain = df_rain.rename(columns={"Value": "Rainfall (mm)"})
         df_tmax = df_tmax.rename(columns={"Value": "Tmax (°C)"})
         df_tmin = df_tmin.rename(columns={"Value": "Tmin (°C)"})
-        df_humidity = df_humidity.rename(columns={"Value": "Humidity (%)"})
 
         df_merge = pd.merge(df_rain, df_tmax, on="Date", how="outer")
         df_merge = pd.merge(df_merge, df_tmin, on="Date", how="outer")
@@ -151,7 +161,11 @@ def process_farm(farm):
         df_merge["Ra_mm"] = df_merge["doy"].apply(
             lambda doy: extraterrestrial_radiation_mm(doy, lat)
         )
-        df_merge["relative_humidity"] = df_humidity["Humidity (%)"] / 100.0
+
+        for dtype, df_extra in optional_data.items():
+            df_merge = pd.merge(df_merge, df_extra, on="Date", how="left")
+            if dtype == "relative_humidity":
+                df_merge[dtype] = df_merge[dtype] / 100.0
 
         def compute_et(row):
             if (
@@ -169,17 +183,15 @@ def process_farm(farm):
         df_merge["ET (mm/day)"] = df_merge.apply(compute_et, axis=1)
         df_merge = df_merge.rename(columns={"Ra_mm": "Ra (mm/day)"})
 
-        final_df = df_merge[
-            [
-                "Date",
-                "Rainfall (mm)",
-                "Tmax (°C)",
-                "Tmin (°C)",
-                "ET (mm/day)",
-                "Ra (mm/day)",
-                "relative_humidity",
-            ]
-        ].copy()
+        base_cols = [
+            "Date",
+            "Rainfall (mm)",
+            "Tmax (°C)",
+            "Tmin (°C)",
+            "ET (mm/day)",
+            "Ra (mm/day)",
+        ]
+        final_df = df_merge[base_cols + list(optional_data.keys())].copy()
 
         final_df["Date"] = pd.to_datetime(final_df["Date"]).dt.strftime("%Y-%m-%d")
         final_df["Latitude"] = lat
