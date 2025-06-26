@@ -21,6 +21,7 @@ STATION_FOLDERS = [
 
 TRAIN_PER_FARM = True
 MODELS_DIR = "models"
+TRAINING_ANALYSIS_DIR = "training_analysis"
 BASE_DIR = "farm_data"
 
 TRAIN_RATIO = 0.70
