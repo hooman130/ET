@@ -2,4 +2,5 @@ __pycache__/
 hawaii-et-rain-website/__pycache__/
 plots/
 models/
+farm_data/
 .env
