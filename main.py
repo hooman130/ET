@@ -47,7 +47,7 @@ parallel = True
 
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-PARTIAL_END_DATE = "2025-03-12"
+PARTIAL_END_DATE = "2025-06-25"
 
 
 def extraterrestrial_radiation_mm(doy, latitude_degs):

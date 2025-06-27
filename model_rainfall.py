@@ -59,7 +59,7 @@ os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "2")
 # TensorFlow / Keras
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Input
+from tensorflow.keras.layers import LSTM, Dense, Input, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 import tensorflow.keras.backend as K
@@ -116,7 +116,7 @@ def feature_engineering(df):
 
     # --- Add the new feature column: relative_humidity ---
     if "relative_humidity" in df.columns:
-        df["relative_humidity"] = df["relative_humidity"]
+        df.loc[:, "relative_humidity"] = df["relative_humidity"]
 
     # Drop columns we don't want in the model
     drop_cols = [
@@ -204,7 +204,9 @@ def train_for_station(station_folder):
     num_features = df_train.shape[1]
     model = Sequential()
     model.add(Input(shape=(WINDOW_SIZE, num_features)))
-    model.add(LSTM(64, activation="tanh"))
+    model.add(LSTM(16, activation="tanh"))
+    model.add(Dropout(0.2))  # Add dropout for regularization
+    model.add(Dense(16, activation="relu"))
     model.add(Dense(HORIZON))
     model.compile(
         loss="mse",
@@ -221,7 +223,7 @@ def train_for_station(station_folder):
         y_train,
         validation_data=(X_val, y_val),
         epochs=50,
-        batch_size=32,
+        batch_size=64,
         callbacks=[early_stop],
         verbose=0,
     )
@@ -234,7 +236,7 @@ def train_for_station(station_folder):
     os.makedirs(station_plot_dir, exist_ok=True)
 
     history_csv_path = os.path.join(station_plot_dir, "training_history_values.csv")
-    history_df = pd.DataFrame(history.history)
+    history_df = pd.DataFrame(history.history).round(4)
     history_df.to_csv(history_csv_path, index=False)
 
     analysis_csv_path = os.path.join(TRAINING_ANALYSIS_DIR, f"{station_folder}_history.csv")
