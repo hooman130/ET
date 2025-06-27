@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
-from config import START_YEAR, END_YEAR
+from config import MAX_WORKERS, START_YEAR, END_YEAR
 import pyet as PyET
 
 # from math import sqrt
@@ -42,7 +42,7 @@ API_URL = "https://api.hcdp.ikewai.org/raster/timeseries"
 # Optional datatypes to fetch for the rainfall model. Rainfall and
 # temperature (Tmax/Tmin) are always retrieved and therefore are not
 # included here.
-ADDITIONAL_DATATYPES = ["relative_humidity"]
+ADDITIONAL_DATATYPES = ["relative_humidity", "ndvi_modis"]
 parallel = True
 
 headers = {"Authorization": f"Bearer {API_TOKEN}"}
@@ -275,7 +275,9 @@ def process_farm(farm):
 
 def main():
     if parallel:
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=MAX_WORKERS
+        ) as executor:
             executor.map(process_farm, farms)
     else:
         for farm in farms:
