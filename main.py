@@ -236,8 +236,8 @@ def process_farm(farm):
             "Tmax (°C)",
             "Tmin (°C)",
             "Tmean (°C)",  # from api
-            "Tavg (°C)",  # average of tmin and tmax
-            "Tmean_final (°C)",  # Tmean if available, else Tavg
+            # "Tavg (°C)",  # average of tmin and tmax
+            # "Tmean_final (°C)",  # Tmean if available, else Tavg
             "ET (mm/day)",
             # "ET2 (mm/day)",
             "Ra (mm/day)",

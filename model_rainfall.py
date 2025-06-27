@@ -209,9 +209,9 @@ def train_for_station(station_folder):
     model.add(Dense(16, activation="relu"))
     model.add(Dense(HORIZON))
     model.compile(
-        loss="mse",
+        loss="mae",
         optimizer=Adam(learning_rate=0.001),
-        metrics=["mae"],
+        metrics=["mse"],
     )
 
     early_stop = EarlyStopping(
@@ -223,7 +223,7 @@ def train_for_station(station_folder):
         y_train,
         validation_data=(X_val, y_val),
         epochs=50,
-        batch_size=64,
+        batch_size=32,
         callbacks=[early_stop],
         verbose=0,
     )
@@ -511,9 +511,9 @@ def main():
     model.add(LSTM(64, activation="tanh", input_shape=(WINDOW_SIZE, num_features)))
     model.add(Dense(HORIZON))
     model.compile(
-        loss="mse",
+        loss="mae",
         optimizer=Adam(learning_rate=0.001),
-        metrics=["mae"],  # add custom R² metric
+        metrics=["mse"],  # add custom R² metric
     )
 
     early_stop = EarlyStopping(
