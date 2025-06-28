@@ -17,10 +17,6 @@ from config import (
     STATION_FOLDERS,
     TRAIN_PER_FARM,
     MODELS_DIR,
-    TRAINING_ANALYSIS_DIR,
-    BASE_DIR,
-    START_YEAR,
-    END_YEAR,
     WINDOW_SIZE,
     HORIZON,
     MAX_WORKERS,
@@ -36,6 +32,11 @@ from training_utils import (
     plot_scatter_day,
     plot_training_history,
 )
+
+
+def get_plots_base_dir(variable_name: str) -> str:
+    """Return base directory for plots of a given variable."""
+    return os.path.join("plots", variable_name.lower())
 
 
 @dataclass
@@ -158,7 +159,8 @@ class LSTMTrainer:
         model_path = os.path.join(MODELS_DIR, f"{station_folder}_{self.model_suffix}.keras")
         model.save(model_path)
 
-        station_plot_dir = os.path.join("plots", f"{self.variable_name.lower()}_{station_folder}")
+        base_dir = get_plots_base_dir(self.variable_name)
+        station_plot_dir = os.path.join(base_dir, station_folder)
         os.makedirs(station_plot_dir, exist_ok=True)
 
         history_csv = os.path.join(station_plot_dir, "training_history_values.csv")
@@ -276,6 +278,9 @@ class LSTMTrainer:
                         "test_r2_day3": r2_each[2],
                     }
                 )
+        pd.DataFrame([metrics]).round(4).to_csv(
+            os.path.join(station_plot_dir, "metrics.csv"), index=False
+        )
         return metrics
 
     # ---------------------------------------
@@ -339,7 +344,8 @@ class LSTMTrainer:
         )
         model.save(f"model_{self.variable_name.lower()}.keras")
 
-        plots_dir = os.path.join("plots", f"combined_{self.variable_name.lower()}")
+        base_dir = get_plots_base_dir(self.variable_name)
+        plots_dir = os.path.join(base_dir, "combined")
         os.makedirs(plots_dir, exist_ok=True)
 
         pd.DataFrame(history.history).to_csv(os.path.join(plots_dir, "training_history_values.csv"), index=False)
@@ -435,8 +441,8 @@ class LSTMTrainer:
 
         train_val_df = pd.DataFrame([train_val_metrics]).round(4)
         test_df = pd.DataFrame(test_metrics_list).round(4)
-        train_val_df.to_csv(os.path.join(plots_dir, "training_validation_metrics.csv"), index=False)
-        test_df.to_csv(os.path.join(plots_dir, "test_metrics.csv"), index=False)
+        train_val_df.to_csv(os.path.join(base_dir, "training_validation_metrics.csv"), index=False)
+        test_df.to_csv(os.path.join(base_dir, "test_metrics.csv"), index=False)
 
     # ---------------------------------------
     def run(self) -> None:
@@ -452,9 +458,42 @@ class LSTMTrainer:
                         metrics_list.append(res)
             if metrics_list:
                 df = pd.DataFrame(metrics_list).round(4)
-                plots_dir = os.path.join("plots", f"{self.variable_name.lower()}_per_farm")
-                os.makedirs(plots_dir, exist_ok=True)
-                df.to_csv(os.path.join(plots_dir, "summary.csv"), index=False)
+                base_dir = get_plots_base_dir(self.variable_name)
+                os.makedirs(base_dir, exist_ok=True)
+                train_val_cols = [
+                    "farm",
+                    "train_loss",
+                    "train_mae",
+                    "train_rmse",
+                    "train_r2_avg",
+                    "train_r2_day1",
+                    "train_r2_day2",
+                    "train_r2_day3",
+                    "val_loss",
+                    "val_mae",
+                    "val_rmse",
+                    "val_r2_avg",
+                    "val_r2_day1",
+                    "val_r2_day2",
+                    "val_r2_day3",
+                ]
+                test_cols = [
+                    "farm",
+                    "test_mae",
+                    "test_mse",
+                    "test_rmse",
+                    "test_r2_avg",
+                    "test_r2_day1",
+                    "test_r2_day2",
+                    "test_r2_day3",
+                ]
+                df[train_val_cols].to_csv(
+                    os.path.join(base_dir, "training_validation_metrics.csv"),
+                    index=False,
+                )
+                df[test_cols].to_csv(
+                    os.path.join(base_dir, "test_metrics.csv"), index=False
+                )
         else:
             self._train_combined()
 
