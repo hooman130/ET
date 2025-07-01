@@ -51,13 +51,10 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", CONFIG_MODELS_DIR)
 models_cache = {}
 scalers_cache = {}
 
-# Caches for loaded models and scalers to avoid re-loading on each request
-models_cache = {}
-scalers_cache = {}
-
 WINDOW_SIZE = CONFIG_WINDOW_SIZE
 HORIZON = CONFIG_HORIZON
-FETCH_TOTAL_DAYS = 50
+# Number of days of data to fetch from the HCDP API. Can be overridden via env var
+FETCH_TOTAL_DAYS = int(os.getenv("FETCH_TOTAL_DAYS", "50"))
 
 
 FEATURE_COLS_FOR_SCALER = ['Rainfall (mm)', 'Tmax (°C)', 'Tmin (°C)', 'ET (mm/day)', 'Ra (mm/day)', 'day', 'month']
