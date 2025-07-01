@@ -1,3 +1,5 @@
+"""Data ingestion script for downloading raw weather data."""
+
 import os
 import math
 import requests

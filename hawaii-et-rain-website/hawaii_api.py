@@ -1,3 +1,7 @@
+"""Simple Flask API exposing ET and rainfall predictions."""
+
+from typing import Any, Dict, List
+
 from flask import Flask, request, jsonify, Response
 import pandas as pd
 from dotenv import load_dotenv
@@ -7,8 +11,19 @@ load_dotenv()
 
 app = Flask(__name__)
 
+
+@app.route('/')
+def index() -> dict:
+    """Return available endpoints for quick reference."""
+    return {
+        'endpoints': [
+            '/api/predict?farm=<NAME>&format=json|csv',
+            '/api/farms'
+        ]
+    }
+
 @app.route('/api/predict')
-def api_predict():
+def api_predict() -> tuple[Response | Any, int] | Response:
     """Return forecast data for a farm as JSON or CSV."""
     farm = request.args.get('farm')
     out_format = request.args.get('format', 'json').lower()
@@ -51,6 +66,12 @@ def api_predict():
         return Response(df.to_csv(index=False), mimetype='text/csv')
 
     return jsonify(output)
+
+
+@app.route('/api/farms')
+def api_farms() -> Dict[str, Dict[str, float]]:
+    """Return mapping of farm names to their coordinates."""
+    return jsonify(farm_coords)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
