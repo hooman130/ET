@@ -5,10 +5,14 @@ import pandas as pd
 import numpy as np
 from math import sqrt
 from datetime import datetime, timedelta
-import joblib 
+import joblib
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-import tensorflow.keras.backend as K 
+import tensorflow.keras.backend as K
+from dotenv import load_dotenv
+from config import MODELS_DIR as CONFIG_MODELS_DIR, WINDOW_SIZE as CONFIG_WINDOW_SIZE, HORIZON as CONFIG_HORIZON
+
+load_dotenv()
 
 
 
@@ -43,15 +47,15 @@ farm_coords = {farm["name"]: {"lat": farm["lat"], "lng": farm["lng"]} for farm i
 
 # Directory containing per-farm models and scaler files
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
+MODELS_DIR = os.path.join(BASE_DIR, "..", CONFIG_MODELS_DIR)
 
 # Caches for loaded models and scalers to avoid re-loading on each request
 models_cache = {}
 scalers_cache = {}
 
 
-WINDOW_SIZE = 24
-HORIZON = 3
+WINDOW_SIZE = CONFIG_WINDOW_SIZE
+HORIZON = CONFIG_HORIZON
 FETCH_TOTAL_DAYS = 50 
 
 
