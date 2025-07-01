@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+2K_Farm_LLC,0.4469,1.041,5.0599,-0.022,-0.0058,-0.0279,-0.0322,28.2142,1.1396,5.3117,-0.0316,-0.0216,-0.0358,-0.0374,1.2322,54.8903,7.4088,-0.0146,-0.0064,-0.018,-0.0194

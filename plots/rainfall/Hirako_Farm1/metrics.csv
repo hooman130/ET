@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+Hirako_Farm1,0.5874,0.7703,2.8385,-0.0119,0.0282,-0.0277,-0.0363,17.359,1.1477,4.1664,-0.0342,-0.0071,-0.0445,-0.0511,1.0486,24.2995,4.9295,-0.0151,0.0098,-0.0264,-0.0286

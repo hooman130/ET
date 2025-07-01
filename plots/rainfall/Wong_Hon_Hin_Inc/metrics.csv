@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+Wong_Hon_Hin_Inc,0.518,1.5094,6.9845,-0.0258,-0.0066,-0.0333,-0.0376,35.008,1.5782,5.9168,-0.0446,-0.0237,-0.0522,-0.0579,1.6097,82.0357,9.0574,-0.0158,-0.0019,-0.0212,-0.0244

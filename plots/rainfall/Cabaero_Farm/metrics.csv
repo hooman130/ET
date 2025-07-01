@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+Cabaero_Farm,0.4197,0.9161,4.342,-0.0188,0.0194,-0.0349,-0.0407,18.5693,1.0495,4.3092,-0.042,-0.0135,-0.0545,-0.0578,1.005,32.7396,5.7219,-0.0158,0.0048,-0.0241,-0.0279

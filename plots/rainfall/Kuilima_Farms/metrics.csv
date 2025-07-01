@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+Kuilima_Farms,0.6737,1.9866,6.5581,-0.0367,-0.0055,-0.051,-0.0536,55.1553,2.2785,7.4267,-0.0433,-0.0213,-0.0538,-0.0548,2.0588,62.3738,7.8977,-0.022,-0.0008,-0.0319,-0.0332

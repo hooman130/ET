@@ -15,9 +15,6 @@ from config import MODELS_DIR as CONFIG_MODELS_DIR, WINDOW_SIZE as CONFIG_WINDOW
 load_dotenv()
 
 
-
-
-
 API_TOKEN = os.getenv("HCDP_API_TOKEN")
 if not API_TOKEN:
     raise RuntimeError("HCDP_API_TOKEN environment variable not set")
@@ -43,6 +40,7 @@ farms = [
     {"name": "Hirako Farm1", "lat": 20.002619, "lng": -155.694092},
     {"name": "Anoano Farms", "lat": 20.020913, "lng": -155.693966},
 ]
+
 farm_coords = {farm["name"]: {"lat": farm["lat"], "lng": farm["lng"]} for farm in farms}
 
 # Directory containing per-farm models and scaler files
@@ -53,17 +51,16 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", CONFIG_MODELS_DIR)
 models_cache = {}
 scalers_cache = {}
 
+# Caches for loaded models and scalers to avoid re-loading on each request
+models_cache = {}
+scalers_cache = {}
 
 WINDOW_SIZE = CONFIG_WINDOW_SIZE
 HORIZON = CONFIG_HORIZON
-FETCH_TOTAL_DAYS = 50 
-
-
+FETCH_TOTAL_DAYS = 50
 
 
 FEATURE_COLS_FOR_SCALER = ['Rainfall (mm)', 'Tmax (°C)', 'Tmin (°C)', 'ET (mm/day)', 'Ra (mm/day)', 'day', 'month']
-
-
 
 
 @tf.keras.utils.register_keras_serializable()
@@ -130,8 +127,6 @@ def load_models_for_farm(farm_name):
     scalers_cache[farm_name] = {'et': scaler_et, 'rain': scaler_rain}
 
     return model_et, model_rain, scaler_et, scaler_rain
-
-
 
 
 def extraterrestrial_radiation_mm(doy, latitude_degs):
@@ -264,8 +259,6 @@ def inverse_transform_predictions(y_scaled, target_scaler, feature_column_order,
     inversed_target_values = inversed_dummy_horizon[:, target_idx_in_scaler]
 
     return inversed_target_values.reshape(1, horizon) 
-
-
 
 
 def fetch_and_predict_hawaii(farm_name):
@@ -430,6 +423,3 @@ if __name__ == "__main__":
                     print(f"  - {pred_date}: ET₀ = {et_str} mm/day, Rainfall = {rain_str} mm")
             else:
                 print(f"\n❌ Prediction failed for {test_farm}. Check console for detailed error messages.")
-
-    
-    

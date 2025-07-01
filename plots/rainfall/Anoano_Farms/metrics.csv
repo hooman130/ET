@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+Anoano_Farms,0.644,1.159,3.5624,-0.0213,0.0224,-0.038,-0.0483,22.0614,1.675,4.697,-0.0542,-0.0117,-0.0704,-0.0805,1.6235,29.4239,5.4244,-0.0318,0.006,-0.0479,-0.0533

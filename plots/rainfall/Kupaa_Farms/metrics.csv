@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+Kupaa_Farms,0.4421,0.9461,4.3215,-0.0128,0.0428,-0.0357,-0.0454,18.3732,1.0736,4.2864,-0.0345,0.0099,-0.0532,-0.0602,0.9946,33.1012,5.7534,-0.0088,0.0219,-0.0212,-0.0272
