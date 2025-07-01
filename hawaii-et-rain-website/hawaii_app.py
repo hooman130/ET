@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import numpy as np 
+import numpy as np
 import pydeck as pdk
 import folium
 from streamlit_folium import st_folium
@@ -14,14 +14,18 @@ from datetime import datetime, timedelta, time as dt_time
 import os
 import urllib.parse
 import json
+from dotenv import load_dotenv
 
 
 from hawaii_web import fetch_and_predict_hawaii, farms, farm_coords, HORIZON
 
+load_dotenv()
 
 
 
-DB_FILE = 'hawaii_daily_process.db'
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, 'hawaii_daily_process.db')
 DEFAULT_HOST = "localhost"
 HOST = os.getenv('HOST_IP', DEFAULT_HOST)
 DEFAULT_LAT = 20.8
