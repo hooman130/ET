@@ -1,3 +1,5 @@
+"""Utility functions used by the Streamlit app and API server."""
+
 import os
 import math
 import requests
@@ -9,6 +11,7 @@ import joblib
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import tensorflow.keras.backend as K
+from typing import Any, Tuple, Optional
 from dotenv import load_dotenv
 from config import MODELS_DIR as CONFIG_MODELS_DIR, WINDOW_SIZE as CONFIG_WINDOW_SIZE, HORIZON as CONFIG_HORIZON
 
@@ -80,8 +83,9 @@ def sanitize_farm_name(farm_name: str) -> str:
                      .replace(")", ""))
 
 
-def load_models_for_farm(farm_name):
-    """Load ET/Rain models and scalers for a specific farm, using caches when available."""
+
+def load_models_for_farm(farm_name: str) -> Tuple[Optional[tf.keras.Model], Optional[tf.keras.Model], Optional[Any], Optional[Any]]:
+    """Load ET and rainfall models along with their scalers for a farm."""
     if farm_name in models_cache and farm_name in scalers_cache:
         return (models_cache[farm_name].get('et'),
                 models_cache[farm_name].get('rain'),
@@ -258,7 +262,8 @@ def inverse_transform_predictions(y_scaled, target_scaler, feature_column_order,
     return inversed_target_values.reshape(1, horizon) 
 
 
-def fetch_and_predict_hawaii(farm_name):
+def fetch_and_predict_hawaii(farm_name: str) -> Optional[dict]:
+    """Fetch recent data from the API and return predictions for ``farm_name``."""
 
     model_et, model_rain, scaler_et, scaler_rain = load_models_for_farm(farm_name)
 

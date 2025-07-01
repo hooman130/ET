@@ -1,3 +1,5 @@
+"""Streamlit dashboard for displaying Hawaiian ET and rainfall forecasts."""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -86,17 +88,22 @@ if api_farm:
 
 
 
-def init_db():
+def init_db() -> None:
+    """Create the SQLite table used to store processed predictions."""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS processed_data
+    c.execute(
+        '''CREATE TABLE IF NOT EXISTS processed_data
                 (timestamp TEXT, farm TEXT, latitude REAL, longitude REAL,
-                 pred_date TEXT, et_pred REAL, rain_pred REAL, last_data_date TEXT)''')
+                 pred_date TEXT, et_pred REAL, rain_pred REAL, last_data_date TEXT)'''
+    )
     conn.commit()
     conn.close()
 
-def save_to_db(results):
-    if not results: return
+def save_to_db(results: dict) -> None:
+    """Persist a prediction result dictionary to the database."""
+    if not results:
+        return
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
