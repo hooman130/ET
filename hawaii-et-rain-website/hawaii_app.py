@@ -24,7 +24,6 @@ from hawaii_web import fetch_and_predict_hawaii, farms, farm_coords, HORIZON
 load_dotenv()
 
 
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Database file is configurable via env; defaults to local file in website dir
 DB_FILE = os.getenv('DB_FILE', os.path.join(BASE_DIR, 'hawaii_daily_process.db'))
