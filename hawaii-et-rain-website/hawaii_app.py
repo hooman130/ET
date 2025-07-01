@@ -23,14 +23,17 @@ load_dotenv()
 
 
 
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_FILE = os.path.join(BASE_DIR, 'hawaii_daily_process.db')
+# Database file is configurable via env; defaults to local file in website dir
+DB_FILE = os.getenv('DB_FILE', os.path.join(BASE_DIR, 'hawaii_daily_process.db'))
 DEFAULT_HOST = "localhost"
 HOST = os.getenv('HOST_IP', DEFAULT_HOST)
-DEFAULT_LAT = 20.8
-DEFAULT_LON = -157.5
-DEFAULT_ZOOM = 7
+
+# Optional Mapbox token for PyDeck visualizations
+MAPBOX_TOKEN = os.getenv('MAPBOX_TOKEN')
+if MAPBOX_TOKEN:
+    pdk.settings.mapbox_api_key = MAPBOX_TOKEN
+
 
 farm_names = list(farm_coords.keys())
 task_running = False
@@ -186,7 +189,11 @@ def daily_prediction_task(list_of_farms):
         print("Task is already running. Skipping.")
 
 def schedule_tasks():
-    schedule.every().day.at("09:37").do(functools.partial(daily_prediction_task, farm_names))
+    # Time of day for the daily prediction task in HH:MM (24h) format
+    schedule_time = os.getenv("SCHEDULE_TIME", "09:37")
+    schedule.every().day.at(schedule_time).do(
+        functools.partial(daily_prediction_task, farm_names)
+    )
 
 
     while True:
