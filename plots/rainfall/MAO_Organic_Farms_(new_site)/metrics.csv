@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+MAO_Organic_Farms_(new_site),0.4954,1.3727,6.1109,-0.0245,-0.0008,-0.0343,-0.0384,30.6759,1.6311,5.5386,-0.0544,-0.0245,-0.0667,-0.0721,1.691,26.4317,5.1412,-0.0652,-0.0211,-0.0836,-0.0908

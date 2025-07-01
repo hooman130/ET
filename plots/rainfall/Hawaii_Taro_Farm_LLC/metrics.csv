@@ -1,0 +1,2 @@
+farm,train_loss,train_mae,train_rmse,train_r2_avg,train_r2_day1,train_r2_day2,train_r2_day3,val_loss,val_mae,val_rmse,val_r2_avg,val_r2_day1,val_r2_day2,val_r2_day3,test_mae,test_mse,test_rmse,test_r2_avg,test_r2_day1,test_r2_day2,test_r2_day3
+Hawaii_Taro_Farm_LLC,0.4177,1.1666,5.2154,0.0095,0.1096,-0.035,-0.0461,43.7019,1.471,6.6107,-0.0154,0.0396,-0.0393,-0.0464,0.9956,27.6167,5.2552,0.0015,0.0547,-0.0213,-0.0291
